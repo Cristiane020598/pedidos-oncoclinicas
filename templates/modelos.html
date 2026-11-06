@@ -1,0 +1,16 @@
+{% extends "base.html" %}{% block titulo %}Modelos de pedido{% endblock %}
+{% block corpo %}
+<h1>Modelos de pedido</h1>
+<p class="sub">O modelo define o cabeçalho (logo), o título, a unidade, o endereço e o médico solicitante. Importe o arquivo que vocês já usam (DOCX ou PDF) — o sistema lê esses dados e você confere.</p>
+<div class="card"><form method="post" action="{{ url_for('modelo_importar') }}" enctype="multipart/form-data" class="linha">
+  <div><label>Arquivo do modelo (DOCX, PDF, ou só a imagem do cabeçalho PNG/JPG)</label><input type="file" name="arquivo" accept=".docx,.pdf,.png,.jpg,.jpeg" required></div>
+  <div><button class="btn">Importar modelo</button></div>
+</form>
+<p class="peq muted">Dica: se a unidade tem vários médicos solicitantes, crie um modelo por médico (importe o mesmo arquivo e troque o nome/CRM).</p></div>
+{% if modelos %}<table class="t"><tr><th>Modelo</th><th>Unidade</th><th>Médico solicitante</th><th>Cabeçalho</th><th></th></tr>
+{% for m in modelos %}<tr><td><a href="{{ url_for('modelo_form', mid=m.id) }}">{{ m.nome }}</a> {% if m.padrao %}<span class="tag validado">padrão</span>{% endif %}<div class="peq muted">{{ m.arquivo_nome or '' }}</div></td>
+<td>{{ m.instituicao or '' }}</td><td>{{ m.medico or '' }} <span class="muted">{{ m.crm or '' }}</span></td>
+<td>{% if m.tem_img %}<img src="{{ url_for('modelo_cabecalho', mid=m.id) }}" style="height:22px;max-width:260px">{% else %}—{% endif %}</td>
+<td><a href="{{ url_for('modelo_exemplo', mid=m.id) }}" target="_blank">ver exemplo PDF</a></td></tr>{% endfor %}</table>
+{% else %}<p class="muted">Nenhum modelo ainda.</p>{% endif %}
+{% endblock %}

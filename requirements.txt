@@ -1,0 +1,7 @@
+flask
+reportlab
+pypdf
+openpyxl
+python-docx
+# opcional — só para o botão "Sugerir cronograma com IA" (precisa de ANTHROPIC_API_KEY):
+# anthropic

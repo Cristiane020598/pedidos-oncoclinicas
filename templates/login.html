@@ -1,0 +1,13 @@
+{% extends "base.html" %}{% block titulo %}Entrar{% endblock %}
+{% block corpo %}
+<div class="card" style="max-width:380px;margin:60px auto">
+  <img src="{{ url_for('static', filename='logo_oncoclinicas.png') }}" alt="OncoClínicas" style="height:38px;width:auto;margin-bottom:14px">
+  <h1>Pedidos de Exames</h1><p class="sub">Pesquisa Clínica</p>
+  <form method="post">
+    <label>E-mail</label><input type="email" name="email" required style="width:100%">
+    <label>Senha</label><input type="password" name="senha" required style="width:100%">
+    <p><button class="btn">Entrar</button></p>
+  </form>
+  <p class="muted peq">Sem acesso? Peça a um administrador para criar seu usuário.</p>
+</div>
+{% endblock %}

@@ -1,0 +1,104 @@
+{% extends "base.html" %}{% block titulo %}Pedido {{ p.id }}{% endblock %}
+{% block head %}<style>
+  .it{display:flex;gap:10px;align-items:flex-start;padding:6px 4px;border-bottom:1px solid #eef2f3}
+  .it.off .nome{text-decoration:line-through;color:#98a2b3}
+  .it .just{display:none;margin-top:4px}
+  .it.off .just{display:block}
+  .grupo{font-weight:700;font-size:12.5px;color:#006666;margin:12px 0 2px;text-transform:uppercase}
+  .cab{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:6px 16px}
+  .cab div span{display:block;font-size:11.5px;color:#6b7280;text-transform:uppercase}
+</style>{% endblock %}
+{% block corpo %}
+{% set editavel = p.status == 'rascunho' %}
+<div class="linha" style="justify-content:space-between">
+  <h1>Pedido nº {{ p.id }} · {{ p.rotulo }} <span class="tag {{ p.status }}">{{ p.status }}</span></h1>
+  <div>{% if p.status != 'cancelado' %}<a class="btn sec" href="{{ url_for('pedido_pdf', pid=p.id) }}" target="_blank">{{ 'Abrir PDF emitido' if p.status=='emitido' else 'Pré-visualizar PDF' }}</a>{% endif %}
+    <a class="btn sec" href="{{ url_for('pedido_novo', paciente=p.paciente_id) }}">Outro pedido p/ este paciente</a></div>
+</div>
+<div class="card cab">
+  <div><span>Paciente</span><b>{{ p.pac_nome }}</b></div>
+  <div><span>Nascimento</span>{{ p.pac_nasc|data_br or '—' }}</div>
+  <div><span>Participante</span>{{ p.pac_part or '—' }}</div>
+  <div><span>Estudo</span>{{ p.estudo_codigo }}{% if p.estudo_nome %} · {{ p.estudo_nome }}{% endif %}</div>
+  <div><span>Ciclo / visita</span>{{ ('Ciclo ' ~ p.ciclo ~ ' – ') if p.ciclo }}{{ p.visita_nome }}{% if p.visita_janela %} <span class="muted">(janela {{ p.visita_janela }})</span>{% endif %}</div>
+  <div><span>Protocolo</span>versão {{ p.proto_versao }} <a class="peq" href="{{ url_for('protocolo', pid=p.protocolo_id) }}">ver cronograma</a></div>
+</div>
+{% if not p.pac_nasc or not p.pac_part %}<div class="aviso">Faltam dados do paciente ({{ 'nascimento' if not p.pac_nasc }}{{ ' e ' if not p.pac_nasc and not p.pac_part }}{{ 'nº do participante' if not p.pac_part }}) — <a href="{{ url_for('paciente_form', pid=p.paciente_id) }}">completar cadastro</a>.</div>{% endif %}
+{% if p.status == 'emitido' %}<div class="flash ok">Emitido em {{ p.emitido_em|data_br }} {{ p.emitido_em[11:16] }} por {{ p.emitido_por }} · SHA-256 do PDF <code class="peq">{{ p.pdf_sha256[:16] }}…</code></div>{% endif %}
+{% if p.status == 'cancelado' %}<div class="flash erro">Cancelado{% if p.cancelado_motivo %}: {{ p.cancelado_motivo }}{% endif %}</div>{% endif %}
+
+<form method="post" id="fp">
+<h2 id="itens">Exames exigidos pelo protocolo nesta visita</h2>
+<div class="card">
+  {% if not todos %}<div class="aviso">O protocolo não tem nenhum exame marcado para esta visita. Confira a matriz do protocolo — o sistema não inclui exames por conta própria.</div>{% endif %}
+  {% set ns = namespace(g=None) %}
+  {% for it in todos %}
+    {% set chave = it.categoria ~ '|' ~ (it.grupo or '') %}
+    {% if chave != ns.g %}{% set ns.g = chave %}<div class="grupo">{{ CAT_TITULO.get(it.categoria, it.categoria) }}{% if it.grupo %} · {{ it.grupo }}{% endif %}</div>{% endif %}
+    <div class="it {{ 'off' if it._removido }}">
+      {% if it.origem == 'manual' %}
+        <span>➕</span>
+        <div style="flex:1"><span class="nome">{{ it.nome }}</span> <span class="tag manual">incluído manualmente</span>
+          {% if it.nota %}<span class="muted peq"> · {{ it.nota }}</span>{% endif %}
+          <div class="peq muted">Justificativa: {{ it.justificativa }} — {{ it.incluido_por }}, {{ it.incluido_em }}</div></div>
+        {% if editavel %}<button class="btn perigo peq" name="acao" value="remover_manual" onclick="document.getElementById('idx').value={{ loop.index0 }}">retirar</button>{% endif %}
+      {% else %}
+        <input type="checkbox" name="item_{{ loop.index0 }}" value="1" {{ 'checked' if not it._removido }} {{ 'disabled' if not editavel }} onchange="this.closest('.it').classList.toggle('off',!this.checked)">
+        <div style="flex:1"><span class="nome">{{ it.nome }}</span>
+          {% if it.nota %}<span class="tag rascunho">{{ it.nota }}</span>{% endif %}
+          {% if it.pagina_ref %}<span class="muted peq"> · protocolo pág. {{ it.pagina_ref }}</span>{% endif %}
+          <div class="just"><input type="text" name="just_{{ loop.index0 }}" value="{{ it.justificativa_remocao or '' }}" placeholder="Por que este exame do protocolo NÃO será pedido? (ex.: já coletado em 10/11, não se aplica – sexo masculino)" style="width:100%" {{ 'disabled' if not editavel }}></div>
+        </div>
+      {% endif %}
+    </div>
+  {% endfor %}
+  <input type="hidden" name="idx" id="idx">
+</div>
+
+{% if editavel %}
+<details class="card" id="adicionar"><summary><b>Incluir exame que não está na matriz do protocolo</b> <span class="muted peq">— só com autorização/justificativa; fica marcado † no PDF e registrado na auditoria</span></summary>
+  <div class="linha">
+    <div><label>Categoria</label><select name="categoria">{% for c, t in CATEGORIAS %}<option value="{{ c }}">{{ t }}</option>{% endfor %}</select></div>
+    <div><label>Grupo</label><input type="text" name="grupo" placeholder="ex.: BIOQUÍMICA SÉRICA"></div>
+    <div style="flex:1"><label>Exame</label><input type="text" name="nome" style="width:100%"></div>
+  </div>
+  <label>Justificativa / quem autorizou *</label><input type="text" name="justificativa" style="width:100%" placeholder="ex.: solicitado pela Dra. X por elevação de ALT na visita anterior">
+  <label>Observação curta para o pedido (opcional)</label><input type="text" name="nota" style="width:100%">
+  <p><button class="btn sec" name="acao" value="adicionar" formnovalidate>Incluir no pedido</button></p>
+</details>
+{% endif %}
+
+<h2>Dados do pedido</h2>
+<div class="card">
+  <div class="linha">
+    <div><label>Data para coleta / realização</label><input type="date" name="data_coleta" value="{{ p.data_coleta }}" {{ 'disabled' if not editavel }}></div>
+    <div><label>Médico solicitante (assina o pedido)</label><select name="medico_id" {{ 'disabled' if not editavel }}>
+      <option value="">— médico do modelo{{ '' }} —</option>
+      {% for m in medicos %}<option value="{{ m.id }}" {{ 'selected' if m.id == p.medico_id }}>{{ m.nome }}{% if m.crm %} · {{ m.crm }}{% endif %}</option>{% endfor %}</select>
+      {% if editavel %}<div class="peq"><a href="{{ url_for('medicos') }}">cadastrar outro médico</a></div>{% endif %}</div>
+    <div><label>Modelo de pedido</label><select name="modelo_id" {{ 'disabled' if not editavel }}>{% for m in modelos %}<option value="{{ m.id }}" {{ 'selected' if m.id == p.modelo_id }}>{{ m.nome }}{{ ' (padrão)' if m.padrao }}</option>{% else %}<option value="">— cadastre um modelo —</option>{% endfor %}</select></div>
+  </div>
+  <label>Imprimir neste pedido (uma página por tipo):</label>
+  {% for c, t in CATEGORIAS %}{% if todos|selectattr('categoria','equalto',c)|list %}
+    <label style="font-weight:400;display:inline-block;margin-right:16px"><input type="checkbox" name="cat_{{ c }}" value="1" {{ 'checked' if c in cats }} {{ 'disabled' if not editavel }}> {{ t.title() }}</label>
+  {% endif %}{% endfor %}
+  <label>Observações (impressas no pedido)</label><textarea name="observacao" rows="2" {{ 'disabled' if not editavel }}>{{ p.observacao or '' }}</textarea>
+</div>
+
+{% if editavel %}
+<div class="card" id="emitir">
+  <p><button class="btn sec" name="acao" value="salvar">Salvar conferência</button>
+     <button class="btn sec" name="acao" value="previa" formtarget="_blank">Salvar e pré-visualizar PDF</button></p>
+  <label style="font-weight:400"><input type="checkbox" name="confirmo" value="1"> Conferi os exames com o protocolo e os dados do paciente. O pedido está pronto para emissão.</label>
+  <p><button class="btn" name="acao" value="emitir">Emitir pedido (PDF definitivo)</button>
+     <span class="peq muted">Depois de emitido o pedido fica bloqueado; o PDF é guardado no histórico com seu nome e horário.</span></p>
+</div>
+{% endif %}
+</form>
+
+{% if editavel %}<form method="post" onsubmit="return confirm('Cancelar este pedido?')" class="linha"><input type="hidden" name="acao" value="cancelar">
+  <input type="text" name="motivo" placeholder="motivo do cancelamento"><button class="btn perigo peq">Cancelar pedido</button></form>{% endif %}
+
+<h2>Histórico deste pedido</h2>
+<table class="t">{% for r in trilha %}<tr><td class="peq" style="white-space:nowrap">{{ r.quando }}</td><td>{{ r.usuario }}</td><td>{{ r.acao }}</td><td class="peq muted" style="word-break:break-word">{{ r.detalhes or '' }}</td></tr>{% endfor %}</table>
+{% endblock %}

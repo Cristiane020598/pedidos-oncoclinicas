@@ -1,0 +1,13 @@
+{% extends "base.html" %}{% block titulo %}Importar pacientes{% endblock %}
+{% block corpo %}
+<h1>Importar planilha de pacientes</h1>
+<p class="sub">Aceita Excel (.xlsx) ou CSV. Na próxima tela você diz qual coluna é o nome, nascimento, nº do participante, estudo etc. — não precisa reorganizar a planilha.</p>
+<div class="card"><form method="post" enctype="multipart/form-data">
+  <input type="file" name="arquivo" accept=".xlsx,.xlsm,.csv" required>
+  <button class="btn">Ler planilha</button>
+</form>
+<p class="peq muted">Pacientes já cadastrados (mesmo nº de participante no estudo, mesmo CPF, ou mesmo nome + nascimento) não são duplicados.</p></div>
+{% if historico %}<h2>Importações anteriores</h2>
+<table class="t"><tr><th>Quando</th><th>Arquivo</th><th>Novos</th><th>Atualizados</th><th>Ignorados</th><th>Por</th></tr>
+{% for h in historico %}<tr><td>{{ h.criado_em }}</td><td>{{ h.arquivo_nome }}</td><td>{{ h.criados }}</td><td>{{ h.atualizados }}</td><td>{{ h.ignorados }}</td><td>{{ h.usuario }}</td></tr>{% endfor %}</table>{% endif %}
+{% endblock %}

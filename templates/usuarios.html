@@ -1,0 +1,18 @@
+{% extends "base.html" %}{% block titulo %}Usuários{% endblock %}
+{% block corpo %}
+<h1>Usuários</h1><p class="sub">Cada ação no sistema fica registrada com o nome do usuário (auditoria).</p>
+<div class="card"><form method="post" class="linha">
+  <input type="hidden" name="acao" value="criar">
+  <div><label>Nome</label><input type="text" name="nome" required></div>
+  <div><label>E-mail</label><input type="email" name="email" required></div>
+  <div><label>Senha inicial</label><input type="password" name="senha" minlength="8" required></div>
+  <div><label><input type="checkbox" name="is_admin" value="1"> Administrador</label></div>
+  <div><button class="btn">Adicionar</button></div>
+</form></div>
+<table class="t"><tr><th>Nome</th><th>E-mail</th><th>Perfil</th><th>Situação</th><th></th></tr>
+{% for u in usuarios %}<tr><td>{{ u.nome }}</td><td>{{ u.email }}</td><td>{{ 'Administrador' if u.is_admin else 'Equipe' }}</td>
+<td>{{ 'Ativo' if u.ativo else 'Desativado' }}</td>
+<td><form method="post"><input type="hidden" name="id" value="{{ u.id }}"><input type="hidden" name="acao" value="{{ 'desativar' if u.ativo else 'ativar' }}">
+<button class="btn sec peq">{{ 'Desativar' if u.ativo else 'Reativar' }}</button></form></td></tr>{% endfor %}
+</table>
+{% endblock %}

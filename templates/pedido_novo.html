@@ -1,0 +1,83 @@
+{% extends "base.html" %}{% block titulo %}Novo pedido{% endblock %}
+{% block corpo %}
+<h1>Novo pedido</h1>
+<p class="sub">Escolha o paciente, o ciclo e a visita. O sistema busca no protocolo validado do estudo os exames exigidos nessa visita — na próxima tela você confere antes de emitir.</p>
+<form method="post" class="card" id="f">
+  <label>Paciente</label>
+  <input type="text" id="busca" list="lista_pac" placeholder="digite o nome ou nº do participante" style="width:100%;max-width:560px" autocomplete="off">
+  <datalist id="lista_pac">{% for p in pacientes %}<option data-id="{{ p.id }}" value="{{ p.nome }} · {{ p.estudo or 'sem estudo' }}{% if p.participante %} · {{ p.participante }}{% endif %}">{% endfor %}</datalist>
+  <input type="hidden" name="paciente_id" id="paciente_id">
+  <div id="info" class="peq muted" style="margin-top:4px"></div>
+
+  <div id="semEstudo" style="display:none"><label>Estudo do paciente</label>
+    <select id="estudoSel"><option value="">— escolha —</option>{% for e in estudos %}<option value="{{ e.id }}">{{ e.codigo }}</option>{% endfor %}</select></div>
+
+  <div id="passo2" style="display:none">
+    <div class="linha">
+      <div><label>Ciclo do tratamento</label>
+        <select name="ciclo" id="ciclo"></select></div>
+      <div><label>Visita</label><select name="visita_id" id="visita" required></select></div>
+      <div><label>Data para coleta / realização *</label><input type="date" name="data_coleta" id="data" value="{{ hoje }}" required></div>
+      <div><label>Médico solicitante</label><select name="medico_id" id="medico">
+        <option value="">— escolher depois —</option>
+        {% for m in medicos %}<option value="{{ m.id }}">{{ m.nome }}{% if m.crm %} · {{ m.crm }}{% endif %}</option>{% endfor %}</select>
+        {% if not medicos %}<div class="peq"><a href="{{ url_for('medicos') }}">cadastrar médicos</a></div>{% endif %}</div>
+    </div>
+    <p class="peq muted" id="protoInfo"></p>
+    <p><button class="btn">Buscar exames no protocolo →</button></p>
+  </div>
+  <div id="semProto" class="aviso" style="display:none"></div>
+</form>
+{% endblock %}
+{% block scripts %}<script>
+const pacs = {};
+document.querySelectorAll('#lista_pac option').forEach(o => pacs[o.value] = o.dataset.id);
+const $ = id => document.getElementById(id);
+let ctx = null;
+
+async function carregar(pid, estudoId){
+  const url = '{{ url_for("api_contexto", pid=0) }}'.replace('/0/', '/' + pid + '/') + (estudoId ? '?estudo_id=' + estudoId : '');
+  ctx = await (await fetch(url)).json();
+  $('paciente_id').value = pid;
+  const p = ctx.paciente;
+  $('info').textContent = 'Nascimento: ' + (p.nascimento || '—') + ' · Participante: ' + (p.participante || '—') + ' · Estudo: ' + (p.estudo || '—');
+  $('semEstudo').style.display = (!p.estudo_id) ? 'block' : 'none';
+  if (!ctx.protocolo){
+    $('passo2').style.display = 'none';
+    $('semProto').style.display = ctx.estudo_id ? 'block' : 'none';
+    $('semProto').innerHTML = 'Este estudo ainda não tem protocolo <b>validado</b>' + (ctx.protocolos_rascunho ? ' (há ' + ctx.protocolos_rascunho + ' em rascunho aguardando conferência)' : '') +
+      '. Vá em <a href="{{ url_for("estudos") }}">Estudos e protocolos</a>.';
+    return;
+  }
+  $('semProto').style.display = 'none';
+  if (ctx.medico_sugerido) $('medico').value = ctx.medico_sugerido;
+  $('passo2').style.display = 'block';
+  $('protoInfo').textContent = 'Protocolo versão ' + ctx.protocolo.versao + ' (validado em ' + ctx.protocolo.validado_em.slice(0,10).split('-').reverse().join('/') + ')';
+  // ciclos possíveis
+  const temFora = ctx.visitas.some(v => v.ciclo_de === null);
+  let max = 0;
+  ctx.visitas.forEach(v => { if (v.ciclo_de !== null) max = Math.max(max, v.ciclo_ate || v.ciclo_de); });
+  const abertos = ctx.visitas.some(v => v.ciclo_de !== null && v.ciclo_ate === null);
+  if (abertos) max = Math.max(max + 10, 30);
+  let html = temFora ? '<option value="">Fora de ciclo (triagem, fim de tratamento…)</option>' : '';
+  for (let c = 1; c <= max; c++) html += '<option value="' + c + '">Ciclo ' + c + '</option>';
+  $('ciclo').innerHTML = html;
+  if (!temFora && max) $('ciclo').value = '1';
+  atualizarVisitas();
+}
+function atualizarVisitas(){
+  const c = $('ciclo').value === '' ? null : parseInt($('ciclo').value);
+  const vs = ctx.visitas.filter(v => c === null ? v.ciclo_de === null : (v.ciclo_de !== null && v.ciclo_de <= c && (v.ciclo_ate === null || v.ciclo_ate >= c)));
+  $('visita').innerHTML = vs.map(v => {
+    let r = v.nome;
+    if (c !== null) r = /^D\s*\d+$/i.test(v.nome) ? 'C' + c + v.nome.replace(/\s/g,'').toUpperCase() : 'C' + c + ' ' + v.nome;
+    return '<option value="' + v.id + '">' + r + (v.janela ? '  (janela ' + v.janela + ')' : '') + '</option>';
+  }).join('') || '<option value="">nenhuma visita para este ciclo no protocolo</option>';
+}
+$('busca').addEventListener('change', e => { const id = pacs[e.target.value]; if (id) carregar(id); });
+$('estudoSel').addEventListener('change', e => { if ($('paciente_id').value) carregar($('paciente_id').value, e.target.value); });
+$('ciclo').addEventListener('change', atualizarVisitas);
+{% if paciente_sel %}
+for (const [k, v] of Object.entries(pacs)) if (v == '{{ paciente_sel }}') { $('busca').value = k; carregar(v); }
+{% endif %}
+</script>{% endblock %}

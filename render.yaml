@@ -1,0 +1,12 @@
+services:
+  - type: web
+    name: pedidos-oncoclinicas
+    runtime: docker
+    plan: free
+    region: ohio
+    healthCheckPath: /login
+    envVars:
+      - key: DATABASE_URL        # endereço do banco Neon (colar no painel do Render)
+        sync: false
+      - key: SECRET_KEY
+        generateValue: true

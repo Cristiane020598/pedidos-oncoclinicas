@@ -1,0 +1,11 @@
+{% extends "base.html" %}{% block titulo %}Auditoria{% endblock %}
+{% block corpo %}
+<h1>Auditoria</h1><p class="sub">Tudo o que foi importado, alterado, validado e emitido — com quem e quando. Últimos 500 registros.</p>
+<form method="get" class="linha card"><div><label>Tipo</label><select name="entidade"><option value="">Todos</option>
+{% for e in ('pedido','protocolo','paciente','importacao','modelo','estudo','usuario') %}<option {{ 'selected' if entidade==e }}>{{ e }}</option>{% endfor %}</select></div>
+<div><button class="btn sec">Filtrar</button></div></form>
+<div class="scroll"><table class="t"><tr><th>Quando</th><th>Usuário</th><th>Ação</th><th>Registro</th><th>Detalhes</th></tr>
+{% for r in registros %}<tr><td class="peq" style="white-space:nowrap">{{ r.quando }}</td><td>{{ r.usuario }}</td><td>{{ r.acao }}</td>
+<td class="peq">{% if r.entidade == 'pedido' %}<a href="{{ url_for('pedido', pid=r.entidade_id) }}">pedido {{ r.entidade_id }}</a>{% elif r.entidade == 'protocolo' %}<a href="{{ url_for('protocolo', pid=r.entidade_id) }}">protocolo {{ r.entidade_id }}</a>{% elif r.entidade == 'paciente' %}<a href="{{ url_for('paciente_form', pid=r.entidade_id) }}">paciente {{ r.entidade_id }}</a>{% else %}{{ r.entidade or '' }} {{ r.entidade_id or '' }}{% endif %}</td>
+<td class="peq" style="max-width:520px;word-break:break-word">{{ r.detalhes or '' }}</td></tr>{% endfor %}</table></div>
+{% endblock %}

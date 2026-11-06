@@ -1,0 +1,60 @@
+{% extends "base.html" %}{% block titulo %}Importar protocolo{% endblock %}
+{% block corpo %}
+<h1>Importar protocolo</h1>
+<p class="sub">Escolha o PDF primeiro: o sistema lê a capa e preenche a versão e o estudo. Confira antes de importar.</p>
+<div class="card"><form method="post" enctype="multipart/form-data">
+  <label>Arquivo PDF do protocolo</label><input type="file" name="arquivo" id="arquivo" accept=".pdf">
+  <div id="lido" class="peq" style="margin:6px 0"></div>
+  <div class="linha">
+    <div><label>Estudo *</label><select name="estudo_id" id="estudo" required>
+      <option value="">— escolha —</option>
+      {% for e in estudos %}<option value="{{ e.id }}" {{ 'selected' if estudo_sel|string == e.id|string }}>{{ e.codigo }}{% if e.nome %} · {{ e.nome }}{% endif %}</option>{% endfor %}
+      <option value="novo">+ Novo estudo…</option></select></div>
+    <div><label>Versão do protocolo *</label><input type="text" name="versao" id="versao" placeholder="ex.: v4.0 – Emenda 3 (12/03/2026)" required style="min-width:300px"></div>
+  </div>
+  <div id="novoEstudo" class="linha" style="display:none">
+    <div><label>Código do estudo *</label><input type="text" name="novo_codigo" id="novo_codigo"></div>
+    <div><label>Nome / sigla</label><input type="text" name="novo_nome" id="novo_nome"></div>
+    <div><label>Patrocinador</label><input type="text" name="novo_patrocinador" id="novo_pat"></div>
+  </div>
+  <p class="peq muted">Pode deixar sem arquivo e montar o cronograma manualmente, mas o ideal é anexar para rastreabilidade.</p>
+  <p><button class="btn">Importar</button></p>
+</form></div>
+{% endblock %}
+{% block scripts %}<script>
+const $ = id => document.getElementById(id);
+const esc = s => String(s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+function mostrarNovo(){ $('novoEstudo').style.display = $('estudo').value === 'novo' ? 'flex' : 'none'; }
+$('estudo').addEventListener('change', mostrarNovo);
+$('arquivo').addEventListener('change', async () => {
+  const f = $('arquivo').files[0];
+  if (!f) return;
+  $('lido').innerHTML = '<span class="muted">Lendo a capa do protocolo…</span>';
+  const fd = new FormData(); fd.append('arquivo', f);
+  let d;
+  try { d = await (await fetch('{{ url_for("protocolo_detectar") }}', {method: 'POST', body: fd})).json(); }
+  catch (e) { $('lido').textContent = 'Não consegui ler o PDF — preencha manualmente.'; return; }
+  if (d.erro) { $('lido').textContent = d.erro; return; }
+  if (d.versao) $('versao').value = d.versao;
+  if (d.estudo_id) $('estudo').value = d.estudo_id;
+  else if (d.codigo || d.titulo_curto) {
+    $('estudo').value = 'novo';
+    $('novo_codigo').value = d.codigo || d.titulo_curto || '';
+    $('novo_nome').value = d.codigo && d.titulo_curto ? d.titulo_curto : '';
+    $('novo_pat').value = d.patrocinador || '';
+  }
+  mostrarNovo();
+  const itens = [];
+  if (d.versao_texto) itens.push('Versão na capa: <b>' + esc(d.versao_texto) + '</b>');
+  if (d.versao_origem) itens.push('<span style="color:#b54708">versão tirada do nome do arquivo' +
+      (d.versao_alternativa ? ' (no texto do PDF aparece "' + esc(d.versao_alternativa) + '")' : ' (não achei no texto do PDF)') + ' — confira</span>');
+  if (d.codigo) itens.push('Código: <b>' + esc(d.codigo) + '</b>');
+  if (d.titulo_curto) itens.push('Sigla: <b>' + esc(d.titulo_curto) + '</b>');
+  if (d.patrocinador) itens.push('Patrocinador: ' + esc(d.patrocinador));
+  if (d.nct) itens.push(esc(d.nct));
+  itens.push(d.paginas + ' páginas');
+  $('lido').innerHTML = itens.length > 1 ? '✔ Lido do PDF: ' + itens.join(' · ') + (d.estudo_id ? ' · <b>estudo já cadastrado</b>' : '')
+                                         : '<span class="muted">Não achei a versão na capa — preencha manualmente.</span>';
+});
+mostrarNovo();
+</script>{% endblock %}

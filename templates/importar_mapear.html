@@ -1,0 +1,25 @@
+{% extends "base.html" %}{% block titulo %}Importar pacientes{% endblock %}
+{% block corpo %}
+<h1>Importar: {{ arquivo }}</h1>
+<p class="sub">{{ total }} linha(s) encontradas. Confira qual coluna corresponde a cada campo (já deixei um palpite).</p>
+<form method="post">
+<input type="hidden" name="etapa" value="importar">
+<div class="card">
+  <div class="grid">
+  {% for campo, rotulo, obrig in campos %}
+    <div><label>{{ rotulo }}{% if obrig %} *{% endif %}</label>
+      <select name="map_{{ campo }}" style="width:100%"><option value="">— não importar —</option>
+      {% for c in colunas %}<option value="{{ c }}" {{ 'selected' if palpite.get(campo) == c }}>{{ c }}</option>{% endfor %}</select></div>
+  {% endfor %}
+  </div>
+  <label>Estudo de todos os pacientes desta planilha</label>
+  <select name="estudo_fixo"><option value="">Usar a coluna "Estudo" (cria o estudo se ainda não existir)</option>
+  {% for e in estudos %}<option value="{{ e.id }}">Todos são do {{ e.codigo }}</option>{% endfor %}</select>
+  <label><input type="checkbox" name="atualizar" value="1" checked> Se o paciente já existir, atualizar os dados com os da planilha</label>
+  <p><button class="btn">Importar {{ total }} linha(s)</button> <a href="{{ url_for('importar_pacientes') }}">cancelar</a></p>
+</div>
+</form>
+<h2>Prévia (primeiras linhas)</h2>
+<div class="scroll"><table class="t"><tr>{% for c in colunas %}<th>{{ c }}</th>{% endfor %}</tr>
+{% for l in amostra %}<tr>{% for c in colunas %}<td>{{ l[c] if l[c] is not none else '' }}</td>{% endfor %}</tr>{% endfor %}</table></div>
+{% endblock %}

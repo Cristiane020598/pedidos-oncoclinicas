@@ -1,0 +1,14 @@
+{% extends "base.html" %}{% block titulo %}Primeiro acesso{% endblock %}
+{% block corpo %}
+<div class="card" style="max-width:420px;margin:60px auto">
+  <img src="{{ url_for('static', filename='logo_oncoclinicas.png') }}" alt="OncoClínicas" style="height:38px;width:auto;margin-bottom:14px">
+  <h1>Primeiro acesso</h1>
+  <p class="sub">Nenhum usuário cadastrado ainda. Crie o administrador do sistema — depois ele cadastra o restante da equipe.</p>
+  <form method="post">
+    <label>Nome</label><input type="text" name="nome" required style="width:100%">
+    <label>E-mail</label><input type="email" name="email" required style="width:100%">
+    <label>Senha (mín. 8 caracteres)</label><input type="password" name="senha" minlength="8" required style="width:100%">
+    <p><button class="btn">Criar administrador</button></p>
+  </form>
+</div>
+{% endblock %}

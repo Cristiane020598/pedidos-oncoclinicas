@@ -1,0 +1,38 @@
+{% extends "base.html" %}{% block titulo %}Modelo {{ m.nome }}{% endblock %}
+{% block corpo %}
+<h1>Modelo: {{ m.nome }} {% if m.padrao %}<span class="tag validado">padrão</span>{% endif %}</h1>
+<p class="sub">{% if m.arquivo_nome %}Lido de <b>{{ m.arquivo_nome }}</b>. {% endif %}Confira os campos — eles vão impressos em todos os pedidos que usarem este modelo.</p>
+<div class="linha" style="align-items:flex-start">
+<form method="post" enctype="multipart/form-data" class="card" style="flex:1;min-width:340px">
+  <label>Nome do modelo (interno)</label><input type="text" name="nome" value="{{ m.nome }}" style="width:100%">
+  <label>Título do documento</label><input type="text" name="titulo" value="{{ m.titulo or '' }}" style="width:100%">
+  <label>Instituição / unidade (1ª linha do quadro)</label><input type="text" name="instituicao" value="{{ m.instituicao or '' }}" style="width:100%">
+  <label>Endereço</label><input type="text" name="endereco" value="{{ m.endereco or '' }}" style="width:100%">
+  <div class="linha">
+    <div><label>Rótulo</label><input type="text" name="medico_rotulo" value="{{ m.medico_rotulo or 'Médica solicitante' }}"></div>
+    <div style="flex:1"><label>Médico(a) solicitante</label><input type="text" name="medico" value="{{ m.medico or '' }}" style="width:100%"></div>
+    <div><label>CRM</label><input type="text" name="crm" value="{{ m.crm or '' }}"></div>
+  </div>
+  <label>Local / instrução de coleta (sai em destaque no pedido laboratorial)</label>
+  <input type="text" name="instrucao_lab" value="{{ m.instrucao_lab or '' }}" placeholder="COLETAR NO AMAIS – Laboratório Amais" style="width:100%">
+  <label style="font-weight:400;margin-top:10px"><input type="checkbox" name="mostrar_assinatura" value="1" {{ 'checked' if m.mostrar_assinatura }}>
+    Mostrar campo de carimbo/assinatura do médico no final do pedido</label>
+  <div class="linha">
+    <div><label>Cor de destaque</label><input type="color" name="cor_destaque" value="{{ m.cor_destaque or '#008080' }}"></div>
+    <div><label>Cor do texto</label><input type="color" name="cor_texto" value="{{ m.cor_texto or '#1B3742' }}"></div>
+    <div><label>Fundo dos quadros</label><input type="color" name="cor_fundo" value="{{ m.cor_fundo or '#EAF4F3' }}"></div>
+  </div>
+  <label>Imagem do cabeçalho (logo/faixa)</label>
+  {% if m.cabecalho_img %}<img src="{{ url_for('modelo_cabecalho', mid=m.id) }}" style="max-width:100%;border:1px solid #dfe6e8;display:block;margin-bottom:6px">
+  <label style="font-weight:400"><input type="checkbox" name="remover_img" value="1"> remover imagem</label>{% endif %}
+  <input type="file" name="cabecalho" accept=".png,.jpg,.jpeg">
+  <input type="hidden" name="rodape" value="{{ m.rodape or '' }}">
+  <p><button class="btn">Salvar</button> <a href="{{ url_for('modelos') }}">voltar</a></p>
+</form>
+<div class="card" style="width:340px">
+  <p><a class="btn sec" href="{{ url_for('modelo_exemplo', mid=m.id) }}" target="_blank">Ver PDF de exemplo</a></p>
+  {% if not m.padrao %}<form method="post"><input type="hidden" name="acao" value="padrao"><button class="btn sec">Usar como padrão</button></form>
+  <p class="peq muted">O modelo padrão é sugerido automaticamente nos pedidos novos (dá para trocar em cada pedido).</p>{% endif %}
+</div>
+</div>
+{% endblock %}

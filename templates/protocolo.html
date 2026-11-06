@@ -1,0 +1,181 @@
+{% extends "base.html" %}{% block titulo %}Protocolo {{ p.estudo_codigo }}{% endblock %}
+{% block head %}<style>
+  .mat th.v{writing-mode:vertical-rl;transform:rotate(180deg);white-space:nowrap;font-size:11.5px;padding:6px 3px;text-transform:none}
+  .mat td.c{text-align:center;padding:3px 2px;min-width:30px}
+  .mat td.c.on{background:#e3f3f1}
+  .mat td.c .nt{font-size:10px;color:#b54708;cursor:pointer;display:block}
+  .mat tr.g td{background:#f8fbfb;font-weight:700;font-size:12px;color:#006666}
+  .mat td.n{white-space:nowrap;max-width:330px;overflow:hidden;text-overflow:ellipsis}
+  #painel{position:fixed;right:16px;bottom:16px;width:min(520px,92vw);max-height:60vh;overflow:auto;background:#fff;border:1px solid #c9d3d6;border-radius:10px;box-shadow:0 10px 30px rgba(0,0,0,.15);padding:12px 14px;display:none;white-space:pre-wrap;font-size:12.5px;z-index:9}
+  .achado{display:flex;gap:8px;align-items:center;padding:3px 0;border-bottom:1px dashed #e5eaeb}
+  .achado .pg a{margin-right:4px}
+</style>{% endblock %}
+{% block corpo %}
+{% set editavel = p.status == 'rascunho' %}
+<div class="linha" style="justify-content:space-between">
+  <div>
+    <h1>{{ p.estudo_codigo }}{% if p.estudo_nome %} · {{ p.estudo_nome }}{% endif %} — protocolo {{ p.versao }} <span class="tag {{ p.status }}">{{ p.status }}</span></h1>
+    <p class="sub">
+      {% if p.arquivo_nome %}<a href="{{ url_for('protocolo_arquivo', pid=p.id) }}" target="_blank">📄 {{ p.arquivo_nome }}</a> · {{ p.paginas }} pág. · SHA-256 <code class="peq">{{ (p.sha256 or '')[:16] }}…</code>{% else %}sem PDF anexado{% endif %}
+      · importado em {{ p.criado_em|data_br }} por {{ p.criado_por }}
+      {% if p.validado_em %} · <b>validado em {{ p.validado_em|data_br }} por {{ p.validado_por }}</b>{% endif %}
+    </p>
+  </div>
+  <div>
+    <details><summary class="btn sec peq" style="list-style:none">Nova versão a partir desta</summary>
+      <form method="post" enctype="multipart/form-data" action="{{ url_for('protocolo_nova_versao', pid=p.id) }}" class="card" style="margin-top:6px">
+        <label>Nome da nova versão</label><input type="text" name="versao" placeholder="ex.: v5.0 – Emenda 4" required>
+        <label>PDF da nova versão (opcional)</label><input type="file" name="arquivo" accept=".pdf">
+        <p class="peq muted">Copia visitas, exames e matriz para um rascunho novo. Esta versão continua valendo até a nova ser validada.</p>
+        <button class="btn peq">Criar rascunho</button></form></details>
+  </div>
+</div>
+{% if outras %}<p class="peq muted">Outras versões: {% for o in outras %}<a href="{{ url_for('protocolo', pid=o.id) }}">{{ o.versao }}</a> <span class="tag {{ o.status }}">{{ o.status }}</span>{{ ' · ' if not loop.last }}{% endfor %}</p>{% endif %}
+
+{% if editavel %}
+<div class="aviso"><b>Rascunho</b> — este cronograma ainda não é usado em nenhum pedido. Monte as visitas e os exames, marque na matriz em quais visitas cada um é exigido e, ao final, valide.
+  O sistema só coloca no pedido o que estiver marcado aqui.</div>
+{% if ia_disponivel and p.arquivo_nome %}
+<form method="post" action="{{ url_for('protocolo_ia', pid=p.id) }}" onsubmit="this.querySelector('button').disabled=true;this.querySelector('button').textContent='Lendo o protocolo... (pode levar alguns minutos)'">
+  <button class="btn sec">✨ Sugerir cronograma com IA</button>
+  <span class="peq muted">Envia o PDF para a API da Anthropic. Tudo o que vier entra como rascunho, marcado "IA", para conferência.</span>
+</form>{% endif %}
+{% else %}
+<div class="aviso">Protocolo <b>{{ p.status }}</b> — bloqueado para edição (rastreabilidade dos pedidos já emitidos). Para mudar, use "Nova versão a partir desta".</div>
+{% endif %}
+
+<h2 id="visitas">1. Visitas do cronograma ({{ visitas|length }})</h2>
+<div class="card">
+{% if visitas %}<table class="t"><tr><th>Visita</th><th>Ciclos</th><th>Janela</th><th>Obs.</th><th></th></tr>
+{% for v in visitas %}<tr><td><b>{{ rotulo_visita(v) }}</b></td>
+<td>{% if v.ciclo_de is none %}fora de ciclo{% elif v.ciclo_ate is none %}ciclo {{ v.ciclo_de }} em diante{% elif v.ciclo_ate == v.ciclo_de %}ciclo {{ v.ciclo_de }}{% else %}ciclos {{ v.ciclo_de }} a {{ v.ciclo_ate }}{% endif %}</td>
+<td>{{ v.janela or '' }}</td><td class="peq muted">{{ v.observacao or '' }}</td>
+<td>{% if editavel %}<form method="post" action="{{ url_for('protocolo_visitas', pid=p.id) }}" onsubmit="return confirm('Excluir a visita {{ rotulo_visita(v) }}?')"><input type="hidden" name="acao" value="excluir"><input type="hidden" name="id" value="{{ v.id }}"><button class="btn perigo peq">excluir</button></form>{% endif %}</td></tr>{% endfor %}</table>{% endif %}
+{% if editavel %}
+<form method="post" action="{{ url_for('protocolo_visitas', pid=p.id) }}" class="linha" style="margin-top:10px">
+  <div><label>Nome da visita</label><input type="text" name="nome" placeholder="Triagem · D1 · D8 · D15 · EOT" required></div>
+  <div><label>Tipo</label><select name="tipo" id="tipoVisita" onchange="document.getElementById('ciclosBox').style.display=this.value=='ciclos'?'flex':'none'">
+    <option value="ciclos">Dentro de ciclo(s)</option><option value="fora">Fora de ciclo (triagem, fim de tratamento, seguimento)</option></select></div>
+  <div id="ciclosBox" class="linha" style="gap:8px">
+    <div style="min-width:80px"><label>Do ciclo</label><input type="number" name="ciclo_de" min="1" value="1" style="width:80px"></div>
+    <div style="min-width:80px"><label>Até o ciclo</label><input type="number" name="ciclo_ate" min="1" placeholder="∞" style="width:80px"></div>
+  </div>
+  <div><label>Janela</label><input type="text" name="janela" placeholder="±3 dias" style="width:100px"></div>
+  <div><button class="btn">Adicionar visita</button></div>
+</form>
+<p class="peq muted">Ex.: "D1" do ciclo 1 ao 1 = C1D1; "D1" do ciclo 2 em diante (deixe "até" vazio) = C2+D1; "D15" ciclos 1 a 4 = C1D15…C4D15.</p>
+{% endif %}
+</div>
+
+<h2 id="itens">2. Exames e procedimentos previstos ({{ itens|length }})</h2>
+<div class="card">
+{% if editavel %}
+<form method="post" action="{{ url_for('protocolo_itens', pid=p.id) }}" id="formItem">
+  <div class="linha">
+    <div><label>Categoria</label><select name="categoria" id="fCat">{% for c, t in CATEGORIAS %}<option value="{{ c }}">{{ t.replace('PEDIDO ','').replace('DE ','').title() }}</option>{% endfor %}</select></div>
+    <div style="flex:1"><label>Grupo (título no pedido)</label><input type="text" name="grupo" id="fGrupo" list="grupos" placeholder="HEMATOLOGIA – HEMOGRAMA COMPLETO" style="width:100%"></div>
+    <div><label>Página(s) no protocolo</label><input type="text" name="pagina_ref" id="fPag" style="width:110px"></div>
+  </div>
+  <label>Nome do exame — pode colar vários, um por linha</label>
+  <textarea name="nome" id="fNome" rows="3" placeholder="Hemoglobina&#10;Hematócrito&#10;Plaquetas"></textarea>
+  <input type="hidden" name="origem" id="fOrigem" value="manual"><input type="hidden" name="trecho_ref" id="fTrecho">
+  <p><button class="btn">Adicionar exame(s)</button></p>
+</form>
+<datalist id="grupos">{% for g in itens|map(attribute='grupo')|unique %}{% if g %}<option value="{{ g }}">{% endif %}{% endfor %}
+  <option value="HEMATOLOGIA – HEMOGRAMA COMPLETO"><option value="BIOQUÍMICA SÉRICA"><option value="COAGULAÇÃO"><option value="URINA"><option value="FUNÇÃO TIREOIDIANA"><option value="SOROLOGIAS"><option value="TOMOGRAFIA COMPUTADORIZADA"><option value="RESSONÂNCIA MAGNÉTICA"><option value="CARDIOLÓGICO"></datalist>
+{% endif %}
+{% if itens %}<table class="t" style="margin-top:8px"><tr><th>Categoria</th><th>Grupo</th><th>Exame</th><th>Pág.</th><th>Origem</th><th></th></tr>
+{% for i in itens %}<tr><td class="peq">{{ i.categoria }}</td><td class="peq">{{ i.grupo or '' }}</td><td>{{ i.nome }}</td><td class="peq">{{ i.pagina_ref or '' }}</td>
+<td><span class="tag {{ i.origem }}">{{ i.origem }}</span></td>
+<td>{% if editavel %}<form method="post" action="{{ url_for('protocolo_itens', pid=p.id) }}"><input type="hidden" name="acao" value="excluir"><input type="hidden" name="id" value="{{ i.id }}"><button class="btn perigo peq">excluir</button></form>{% endif %}</td></tr>{% endfor %}</table>
+{% endif %}
+</div>
+
+{% if busca %}
+<details class="card" {{ 'open' if editavel and not itens }}>
+  <summary><b>🔎 Onde o protocolo menciona exames</b> <span class="muted peq">— busca de termos no texto do PDF, para ajudar a localizar (não entra no pedido sozinho)</span></summary>
+  <p class="peq">Páginas que parecem ser o cronograma (Schedule of Activities):
+    {% for n in busca.paginas_cronograma %}<a href="#" onclick="verPagina({{ n }});return false">{{ n }}</a> {% else %}<span class="muted">não identificadas — procure no sumário do PDF.</span>{% endfor %}</p>
+  {% for a in busca.achados %}
+  <div class="achado"><span class="tag {{ 'protocolo' if a.no_cronograma else 'substituido' }}">{{ a.categoria }}</span>
+    <span style="min-width:180px"><b>{{ a.termo }}</b> <span class="muted peq">{{ a.grupo }}</span></span>
+    <span class="pg peq">pág. {% for n in a.paginas[:12] %}<a href="#" onclick="verPagina({{ n }});return false">{{ n }}</a>{% endfor %}{% if a.paginas|length > 12 %}…{% endif %}</span>
+    {% if editavel %}<button class="btn sec peq" onclick='preencher({{ a.categoria|tojson }}, {{ a.grupo|tojson }}, {{ a.termo|tojson }}, {{ a.paginas[:5]|join(",")|tojson }}, {{ (a.trecho or "")|tojson }})'>usar</button>{% endif %}
+  </div>{% endfor %}
+</details>
+{% endif %}
+
+<h2 id="matriz">3. Matriz: em quais visitas cada exame é exigido</h2>
+{% if visitas and itens %}
+<form method="post" action="{{ url_for('protocolo_matriz', pid=p.id) }}">
+<div class="scroll card" style="padding:0"><table class="t mat">
+<tr><th>Exame</th>{% for v in visitas %}<th class="v">{{ rotulo_visita(v) }}</th>{% endfor %}</tr>
+{% set ns = namespace(g=None) %}
+{% for i in itens %}
+  {% set chave = i.categoria ~ '|' ~ (i.grupo or '') %}
+  {% if chave != ns.g %}{% set ns.g = chave %}<tr class="g"><td colspan="{{ visitas|length + 1 }}">{{ i.categoria|upper }}{% if i.grupo %} · {{ i.grupo }}{% endif %}
+    {% if editavel %}<a href="#" class="peq" style="font-weight:400" onclick="marcarGrupo(this);return false">marcar linha inteira por visita…</a>{% endif %}</td></tr>{% endif %}
+  <tr data-grupo="{{ chave }}"><td class="n" title="{{ i.nome }}">{{ i.nome }}</td>
+  {% for v in visitas %}{% set k = (v.id, i.id) %}
+    <td class="c {{ 'on' if k in marc }}" data-v="{{ v.id }}"><input type="checkbox" name="m_{{ v.id }}_{{ i.id }}" value="1" {{ 'checked' if k in marc }} {{ 'disabled' if not editavel }} onchange="this.parentNode.classList.toggle('on',this.checked)">
+      <input type="hidden" name="n_{{ v.id }}_{{ i.id }}" value="{{ marc.get(k, '') }}">
+      {% if editavel %}<span class="nt" title="Condição (ex.: se clinicamente indicado)" onclick="nota(this)">{{ '✎ ' ~ marc.get(k) if marc.get(k) else '✎' }}</span>{% elif marc.get(k) %}<span class="nt" title="{{ marc.get(k) }}">nota</span>{% endif %}</td>
+  {% endfor %}</tr>
+{% endfor %}
+</table></div>
+{% if editavel %}<p><button class="btn">Salvar matriz</button> <span class="peq muted">✎ = condição do protocolo para aquele exame naquela visita (aparece no pedido em letra menor).</span></p>{% endif %}
+</form>
+{% else %}<p class="muted">Cadastre visitas e exames acima para montar a matriz.</p>{% endif %}
+
+{% if editavel %}
+<h2>4. Validar</h2>
+<form method="post" action="{{ url_for('protocolo_validar', pid=p.id) }}" class="card">
+  <label style="font-weight:400"><input type="checkbox" name="confirmo" value="1"> Conferi visitas, exames e a matriz com o protocolo {{ p.versao }} e confirmo que estão corretos.</label>
+  <p><button class="btn">Validar protocolo</button> <span class="peq muted">Fica registrado com seu nome e a data. Depois de validado, não pode ser editado.</span></p>
+</form>
+{% endif %}
+
+<div id="painel"><div style="display:flex;justify-content:space-between;position:sticky;top:-12px;background:#fff;padding-bottom:4px"><b id="painelTit"></b><a href="#" onclick="painel.style.display='none';return false">fechar ✕</a></div><div id="painelTxt"></div></div>
+{% endblock %}
+{% block scripts %}<script>
+const painel = document.getElementById('painel');
+async function verPagina(n){
+  const r = await fetch('{{ url_for("protocolo_pagina", pid=p.id, n=0) }}'.replace(/0$/, n));
+  const j = await r.json();
+  document.getElementById('painelTit').textContent = 'Página ' + n + ' (texto extraído)';
+  document.getElementById('painelTxt').textContent = j.texto || '(sem texto nesta página — pode ser imagem; abra o PDF)';
+  painel.style.display = 'block';
+}
+function preencher(cat, grupo, termo, pags, trecho){
+  document.getElementById('fCat').value = cat;
+  document.getElementById('fGrupo').value = grupo;
+  document.getElementById('fNome').value = termo.charAt(0).toUpperCase() + termo.slice(1);
+  document.getElementById('fPag').value = pags;
+  document.getElementById('fTrecho').value = trecho;
+  document.getElementById('fOrigem').value = 'sugestao';
+  document.getElementById('formItem').scrollIntoView({behavior:'smooth'});
+  document.getElementById('fNome').focus();
+}
+function nota(el){
+  const h = el.parentNode.querySelector('input[type=hidden]');
+  const v = prompt('Condição/observação do protocolo para este exame nesta visita (deixe vazio para remover):', h.value);
+  if (v === null) return;
+  h.value = v.trim();
+  el.textContent = h.value ? '✎ ' + h.value : '✎';
+  if (h.value) { const cb = el.parentNode.querySelector('input[type=checkbox]'); cb.checked = true; el.parentNode.classList.add('on'); }
+}
+function marcarGrupo(a){
+  const tr = a.closest('tr');
+  const vis = [...document.querySelectorAll('.mat th.v')].map(th => th.textContent.trim());
+  const qual = prompt('Marcar TODOS os exames deste grupo em qual visita? Digite exatamente como no cabeçalho:\n' + vis.join(' · '));
+  if (!qual) return;
+  const idx = vis.indexOf(qual.trim());
+  if (idx < 0) { alert('Visita não encontrada.'); return; }
+  let r = tr.nextElementSibling;
+  while (r && !r.classList.contains('g')) {
+    const td = r.querySelectorAll('td.c')[idx];
+    td.querySelector('input[type=checkbox]').checked = true; td.classList.add('on');
+    r = r.nextElementSibling;
+  }
+}
+</script>{% endblock %}

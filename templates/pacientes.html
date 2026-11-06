@@ -1,0 +1,20 @@
+{% extends "base.html" %}{% block titulo %}Pacientes{% endblock %}
+{% block corpo %}
+<div class="linha" style="justify-content:space-between">
+  <div><h1>Pacientes</h1><p class="sub">{{ pacientes|length }} encontrado(s){% if pacientes|length == 500 %} (mostrando os 500 primeiros){% endif %}</p></div>
+  <div><a class="btn" href="{{ url_for('importar_pacientes') }}">Importar planilha</a> <a class="btn sec" href="{{ url_for('paciente_form') }}">+ Cadastrar um</a></div>
+</div>
+<form class="linha card" method="get">
+  <div><label>Buscar</label><input type="text" name="q" value="{{ q }}" placeholder="nome, nº participante ou CPF" style="min-width:260px"></div>
+  <div><label>Estudo</label><select name="estudo"><option value="">Todos</option>{% for e in estudos %}<option value="{{ e.id }}" {{ 'selected' if estudo|string == e.id|string }}>{{ e.codigo }}</option>{% endfor %}</select></div>
+  <div><button class="btn sec">Filtrar</button></div>
+</form>
+<div class="scroll"><table class="t">
+<tr><th>Nome</th><th>Nascimento</th><th>Estudo</th><th>Participante</th><th>CPF</th><th>Médico</th><th></th></tr>
+{% for p in pacientes %}<tr>
+  <td><a href="{{ url_for('paciente_form', pid=p.id) }}">{{ p.nome }}</a></td><td>{{ p.nascimento|data_br }}</td>
+  <td>{{ p.estudo_codigo or '—' }}</td><td>{{ p.participante or '—' }}</td><td>{{ p.cpf or '' }}</td><td>{{ p.medico or '' }}</td>
+  <td><a class="btn peq" href="{{ url_for('pedido_novo', paciente=p.id) }}">Novo pedido</a></td></tr>
+{% else %}<tr><td colspan="7" class="muted">Nenhum paciente. Importe a planilha para carregar todos de uma vez.</td></tr>{% endfor %}
+</table></div>
+{% endblock %}

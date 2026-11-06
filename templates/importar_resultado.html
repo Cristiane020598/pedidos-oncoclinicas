@@ -1,0 +1,11 @@
+{% extends "base.html" %}{% block titulo %}Importação concluída{% endblock %}
+{% block corpo %}
+<h1>Importação concluída</h1><p class="sub">{{ arquivo }}</p>
+<div class="grid">
+  <div class="card"><div class="num">{{ criados }}</div>pacientes novos</div>
+  <div class="card"><div class="num">{{ atualizados }}</div>atualizados</div>
+  <div class="card"><div class="num">{{ ignorados }}</div>ignorados (sem nome ou já iguais)</div>
+</div>
+{% if problemas %}<div class="aviso"><b>Conferir:</b><ul>{% for p in problemas %}<li>{{ p }}</li>{% endfor %}</ul></div>{% endif %}
+<p><a class="btn" href="{{ url_for('pacientes') }}">Ver pacientes</a> <a class="btn sec" href="{{ url_for('importar_pacientes') }}">Importar outra</a></p>
+{% endblock %}

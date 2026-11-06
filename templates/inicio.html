@@ -1,0 +1,22 @@
+{% extends "base.html" %}{% block titulo %}Início{% endblock %}
+{% block corpo %}
+<h1>Olá, {{ usuario_nome.split(' ')[0] }}</h1>
+<p class="sub">Selecione o paciente, o ciclo e a visita — o sistema busca no protocolo validado os exames exigidos, você confere e emite o PDF.</p>
+<p><a class="btn" href="{{ url_for('pedido_novo') }}">+ Novo pedido</a>
+   <a class="btn sec" href="{{ url_for('importar_pacientes') }}">Importar planilha de pacientes</a>
+   <a class="btn sec" href="{{ url_for('protocolo_novo') }}">Importar protocolo</a></p>
+<div class="grid">
+  <div class="card"><div class="num">{{ n.pacientes }}</div>pacientes cadastrados</div>
+  <div class="card"><div class="num">{{ n.estudos }}</div>estudos</div>
+  <div class="card"><div class="num">{{ n.protocolos_validados }}</div>protocolos validados
+    {% if n.protocolos_rascunho %}<div class="peq muted">{{ n.protocolos_rascunho }} em rascunho (aguardando conferência)</div>{% endif %}</div>
+  <div class="card"><div class="num">{{ n.pedidos_emitidos }}</div>pedidos emitidos
+    {% if n.pedidos_rascunho %}<div class="peq muted">{{ n.pedidos_rascunho }} em conferência</div>{% endif %}</div>
+</div>
+{% if not n.modelos %}<div class="aviso">Nenhum modelo de pedido cadastrado. Vá em <a href="{{ url_for('modelos') }}">Modelos</a> e importe o modelo (DOCX ou PDF) antes de emitir pedidos.</div>{% endif %}
+<h2>Pedidos recentes</h2>
+{% if recentes %}<table class="t"><tr><th>Nº</th><th>Paciente</th><th>Estudo</th><th>Visita</th><th>Data coleta</th><th>Situação</th></tr>
+{% for r in recentes %}<tr><td><a href="{{ url_for('pedido', pid=r.id) }}">{{ r.id }}</a></td><td>{{ r.paciente }}</td><td>{{ r.estudo }}</td>
+<td>{{ r.rotulo }}</td><td>{{ r.data_coleta|data_br }}</td><td><span class="tag {{ r.status }}">{{ r.status }}</span></td></tr>{% endfor %}</table>
+{% else %}<p class="muted">Nenhum pedido ainda.</p>{% endif %}
+{% endblock %}

@@ -1,0 +1,26 @@
+{% extends "base.html" %}{% block titulo %}Paciente{% endblock %}
+{% block corpo %}
+<h1>{{ p.nome if p else 'Cadastrar paciente' }}</h1>
+<div class="card"><form method="post">
+  <div class="linha">
+    <div style="flex:2"><label>Nome completo *</label><input type="text" name="nome" value="{{ p.nome if p else '' }}" required style="width:100%"></div>
+    <div><label>Data de nascimento</label><input type="date" name="nascimento" value="{{ p.nascimento if p and p.nascimento else '' }}"></div>
+    <div><label>CPF</label><input type="text" name="cpf" value="{{ p.cpf if p and p.cpf else '' }}"></div>
+  </div>
+  <div class="linha">
+    <div><label>Estudo</label><select name="estudo_id"><option value="">—</option>{% for e in estudos %}<option value="{{ e.id }}" {{ 'selected' if p and p.estudo_id == e.id }}>{{ e.codigo }}{% if e.nome %} · {{ e.nome }}{% endif %}</option>{% endfor %}</select></div>
+    <div><label>Nº do participante</label><input type="text" name="participante" value="{{ p.participante if p and p.participante else '' }}"></div>
+    <div><label>Telefone</label><input type="text" name="telefone" value="{{ p.telefone if p and p.telefone else '' }}"></div>
+    <div><label>Médico responsável</label><input type="text" name="medico" value="{{ p.medico if p and p.medico else '' }}"></div>
+  </div>
+  <label>Observação</label><textarea name="observacao" rows="2">{{ p.observacao if p and p.observacao else '' }}</textarea>
+  <p><button class="btn">Salvar</button> <a href="{{ url_for('pacientes') }}">voltar</a>
+  {% if p %}<a class="btn sec" style="float:right" href="{{ url_for('pedido_novo', paciente=p.id) }}">Novo pedido para este paciente</a>{% endif %}</p>
+</form>
+{% if p %}<form method="post" onsubmit="return confirm('Arquivar este paciente? Os pedidos continuam no histórico.')"><input type="hidden" name="acao" value="arquivar"><button class="btn perigo peq">Arquivar paciente</button></form>{% endif %}
+</div>
+{% if pedidos %}<h2>Pedidos deste paciente</h2>
+<table class="t"><tr><th>Nº</th><th>Visita</th><th>Data coleta</th><th>Situação</th><th>Criado</th></tr>
+{% for r in pedidos %}<tr><td><a href="{{ url_for('pedido', pid=r.id) }}">{{ r.id }}</a></td><td>{{ r.rotulo }}</td><td>{{ r.data_coleta|data_br }}</td>
+<td><span class="tag {{ r.status }}">{{ r.status }}</span></td><td>{{ r.criado_em|data_br }} · {{ r.criado_por }}</td></tr>{% endfor %}</table>{% endif %}
+{% endblock %}

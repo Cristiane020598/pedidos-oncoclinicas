@@ -1,0 +1,32 @@
+{% extends "base.html" %}{% block titulo %}Estudos e protocolos{% endblock %}
+{% block corpo %}
+<h1>Estudos e protocolos</h1>
+<p class="sub">Cada estudo tem versões de protocolo. Só a versão <b>validada</b> é usada para montar os pedidos; ao validar uma nova versão (emenda), a anterior fica como "substituído".</p>
+<div class="card"><h3 style="margin-top:0">Cadastrar estudo</h3>
+<form method="post" class="linha">
+  <div><label>Código do estudo *</label><input type="text" name="codigo" placeholder="MCLA-158-CL02" required></div>
+  <div><label>Nome / droga</label><input type="text" name="nome" placeholder="Petosemtamabe"></div>
+  <div><label>Patrocinador</label><input type="text" name="patrocinador"></div>
+  <div><button class="btn">Salvar</button></div>
+</form></div>
+{% for e in estudos %}
+<div class="card">
+  <div class="linha" style="justify-content:space-between">
+    <div><b style="font-size:16px">{{ e.codigo }}</b> {% if e.nome %}· {{ e.nome }}{% endif %} {% if e.patrocinador %}<span class="muted">· {{ e.patrocinador }}</span>{% endif %}
+      <div class="peq muted">{{ e.n_pac }} paciente(s) · <a href="{{ url_for('pacientes', estudo=e.id) }}">ver pacientes</a></div></div>
+    <div><a class="btn sec peq" href="{{ url_for('protocolo_novo', estudo=e.id) }}">+ Importar protocolo</a>
+      <details style="display:inline-block"><summary class="peq" style="cursor:pointer">editar</summary>
+      <form method="post" class="linha"><input type="hidden" name="id" value="{{ e.id }}">
+        <input type="text" name="codigo" value="{{ e.codigo }}"><input type="text" name="nome" value="{{ e.nome or '' }}" placeholder="nome">
+        <input type="text" name="patrocinador" value="{{ e.patrocinador or '' }}" placeholder="patrocinador"><button class="btn peq">ok</button></form></details></div>
+  </div>
+  {% set ps = protocolos.get(e.id, []) %}
+  {% if ps %}<table class="t" style="margin-top:10px"><tr><th>Versão</th><th>Arquivo</th><th>Situação</th><th>Validado</th><th></th></tr>
+  {% for p in ps %}<tr><td>{{ p.versao }}</td><td>{{ p.arquivo_nome or '—' }}</td><td><span class="tag {{ p.status }}">{{ p.status }}</span></td>
+  <td>{% if p.validado_em %}{{ p.validado_em|data_br }} · {{ p.validado_por }}{% endif %}</td>
+  <td><a href="{{ url_for('protocolo', pid=p.id) }}">abrir cronograma</a></td></tr>{% endfor %}</table>
+  {% else %}<p class="muted peq">Nenhum protocolo importado.</p>{% endif %}
+</div>
+{% else %}<p class="muted">Nenhum estudo cadastrado. Eles também são criados automaticamente ao importar a planilha de pacientes (pela coluna do código do estudo).</p>
+{% endfor %}
+{% endblock %}

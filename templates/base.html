@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>{% block titulo %}Pedidos de Exames{% endblock %} — Pesquisa Clínica</title>
+<style>
+  :root{--teal:#008080;--teal-2:#006666;--ink:#1B3742;--fundo:#EAF4F3;--cinza:#6b7280;--linha:#dfe6e8;--bg:#f5f8f8;--erro:#b42318;--ok:#067647;--alerta:#b54708;}
+  *{box-sizing:border-box}
+  body{margin:0;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Arial,sans-serif;background:var(--bg);color:var(--ink);font-size:14px;line-height:1.45}
+  a{color:var(--teal-2)}
+  header{background:#fff;border-bottom:3px solid var(--teal);}
+  .top{max-width:1240px;margin:0 auto;padding:10px 20px;display:flex;align-items:center;gap:22px;flex-wrap:wrap}
+  .marca{font-weight:800;color:var(--teal);font-size:16px;text-decoration:none;letter-spacing:.3px}
+  .marca small{display:block;color:var(--cinza);font-weight:500;font-size:11px;letter-spacing:0}
+  nav{display:flex;gap:4px;flex-wrap:wrap;flex:1}
+  nav a{padding:7px 11px;border-radius:7px;text-decoration:none;color:var(--ink);font-weight:600;font-size:13.5px}
+  nav a:hover,nav a.on{background:var(--fundo);color:var(--teal-2)}
+  .user{font-size:12.5px;color:var(--cinza)}
+  main{max-width:1240px;margin:0 auto;padding:22px 20px 60px}
+  h1{font-size:21px;margin:0 0 4px} h2{font-size:16.5px;margin:24px 0 8px} h3{font-size:14.5px;margin:16px 0 6px}
+  .sub{color:var(--cinza);margin:0 0 18px}
+  .card{background:#fff;border:1px solid var(--linha);border-radius:10px;padding:16px 18px;margin-bottom:16px}
+  .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:14px}
+  .num{font-size:26px;font-weight:800;color:var(--teal)}
+  table.t{width:100%;border-collapse:collapse;background:#fff}
+  table.t th,table.t td{border-bottom:1px solid var(--linha);padding:7px 8px;text-align:left;vertical-align:top}
+  table.t th{background:var(--fundo);font-size:12px;text-transform:uppercase;letter-spacing:.3px}
+  .btn{display:inline-block;background:var(--teal);color:#fff;border:0;border-radius:7px;padding:8px 14px;font-weight:700;font-size:13.5px;cursor:pointer;text-decoration:none}
+  .btn:hover{background:var(--teal-2)}
+  .btn.sec{background:#fff;color:var(--teal-2);border:1px solid var(--teal)}
+  .btn.perigo{background:#fff;color:var(--erro);border:1px solid var(--erro)}
+  .btn.peq{padding:4px 9px;font-size:12px}
+  input[type=text],input[type=email],input[type=password],input[type=date],input[type=number],select,textarea{border:1px solid #c9d3d6;border-radius:6px;padding:7px 9px;font:inherit;background:#fff;max-width:100%}
+  textarea{width:100%}
+  label{font-weight:600;font-size:13px;display:block;margin:8px 0 3px}
+  .linha{display:flex;gap:12px;flex-wrap:wrap;align-items:flex-end}
+  .linha>div{min-width:150px}
+  .flash{padding:10px 14px;border-radius:8px;margin-bottom:12px;font-weight:600}
+  .flash.erro{background:#fef3f2;color:var(--erro);border:1px solid #fecdca}
+  .flash.ok{background:#ecfdf3;color:var(--ok);border:1px solid #abefc6}
+  .tag{display:inline-block;padding:1px 8px;border-radius:20px;font-size:11.5px;font-weight:700}
+  .tag.validado,.tag.emitido{background:#ecfdf3;color:var(--ok)}
+  .tag.rascunho{background:#fffaeb;color:var(--alerta)}
+  .tag.substituido,.tag.cancelado{background:#f2f4f7;color:var(--cinza)}
+  .tag.ia{background:#f4f3ff;color:#5925dc} .tag.manual{background:#fef6ee;color:#b93815} .tag.protocolo{background:var(--fundo);color:var(--teal-2)}
+  .muted{color:var(--cinza)} .peq{font-size:12px}
+  .aviso{background:#fffaeb;border:1px solid #fedf89;color:#7a2e0e;padding:10px 14px;border-radius:8px;margin:10px 0}
+  .scroll{overflow-x:auto}
+  @media (max-width:700px){nav{order:3;width:100%}}
+</style>
+{% block head %}{% endblock %}
+</head>
+<body>
+{% if usuario_nome %}
+<header><div class="top">
+  <a class="marca" href="{{ url_for('inicio') }}" style="display:flex;align-items:center;gap:12px">
+    <img src="{{ url_for('static', filename='logo_oncoclinicas.png') }}" alt="OncoClínicas" style="height:26px;width:auto">
+    <span style="border-left:1px solid var(--linha);padding-left:12px">Pedidos de Exames<small>Pesquisa Clínica</small></span></a>
+  <nav>
+    {% set ep = request.endpoint or '' %}
+    <a href="{{ url_for('pedido_novo') }}" class="{{ 'on' if ep=='pedido_novo' }}">+ Novo pedido</a>
+    <a href="{{ url_for('pedidos') }}" class="{{ 'on' if ep in ('pedidos','pedido') }}">Pedidos</a>
+    <a href="{{ url_for('pacientes') }}" class="{{ 'on' if ep.startswith('paciente') or ep=='importar_pacientes' }}">Pacientes</a>
+    <a href="{{ url_for('estudos') }}" class="{{ 'on' if ep.startswith('estudo') or ep.startswith('protocolo') }}">Estudos e protocolos</a>
+    <a href="{{ url_for('medicos') }}" class="{{ 'on' if ep=='medicos' }}">Médicos</a>
+    <a href="{{ url_for('modelos') }}" class="{{ 'on' if ep.startswith('modelo') }}">Modelos</a>
+    <a href="{{ url_for('auditoria') }}" class="{{ 'on' if ep=='auditoria' }}">Auditoria</a>
+    {% if is_admin %}<a href="{{ url_for('usuarios') }}" class="{{ 'on' if ep=='usuarios' }}">Usuários</a>{% endif %}
+  </nav>
+  <span class="user">{{ usuario_nome }} · <a href="{{ url_for('logout') }}">sair</a></span>
+</div></header>
+{% endif %}
+<main>
+  {% for cat, msg in get_flashed_messages(with_categories=true) %}<div class="flash {{ cat }}">{{ msg }}</div>{% endfor %}
+  {% block corpo %}{% endblock %}
+</main>
+{% block scripts %}{% endblock %}
+</body>
+</html>

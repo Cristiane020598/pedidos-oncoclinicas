@@ -1,0 +1,22 @@
+{% extends "base.html" %}{% block titulo %}Médicos{% endblock %}
+{% block corpo %}
+<h1>Médicos solicitantes</h1>
+<p class="sub">Quem assina o pedido. Em cada pedido você escolhe o médico; o sistema sugere o último usado para o paciente
+(ou o médico responsável da planilha). O nome e o CRM saem no quadro do topo e na assinatura do PDF.</p>
+<div class="card"><form method="post" class="linha">
+  <div style="flex:1"><label>Nome (como sai no pedido) *</label><input type="text" name="nome" placeholder="Dra. Nome Sobrenome" required style="width:100%"></div>
+  <div><label>CRM</label><input type="text" name="crm" placeholder="CRM/SP 000000"></div>
+  <div><label>Rótulo</label><select name="rotulo"><option>Médica solicitante</option><option>Médico solicitante</option><option>Investigador(a) principal</option><option>Subinvestigador(a)</option></select></div>
+  <div><button class="btn">Adicionar</button></div>
+</form></div>
+<table class="t"><tr><th>Nome</th><th>CRM</th><th>Rótulo</th><th>Pedidos</th><th>Situação</th><th></th></tr>
+{% for m in medicos %}<tr>
+  <td colspan="3"><form method="post" class="linha" style="gap:6px"><input type="hidden" name="id" value="{{ m.id }}">
+    <input type="text" name="nome" value="{{ m.nome }}" style="min-width:240px"><input type="text" name="crm" value="{{ m.crm or '' }}">
+    <input type="text" name="rotulo" value="{{ m.rotulo or '' }}"><button class="btn sec peq">salvar</button></form></td>
+  <td>{{ m.n_ped }}</td><td>{{ 'Ativo' if m.ativo else 'Inativo' }}</td>
+  <td><form method="post"><input type="hidden" name="id" value="{{ m.id }}"><input type="hidden" name="acao" value="{{ 'desativar' if m.ativo else 'ativar' }}">
+    <button class="btn sec peq">{{ 'Desativar' if m.ativo else 'Reativar' }}</button></form></td></tr>
+{% else %}<tr><td colspan="6" class="muted">Nenhum médico cadastrado. O médico do modelo importado entra aqui automaticamente.</td></tr>{% endfor %}
+</table>
+{% endblock %}
