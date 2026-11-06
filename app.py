@@ -65,6 +65,16 @@ def admin_required(f):
     return w
 
 
+@app.before_request
+def _exige_banco_no_servidor():
+    """No Render (RENDER=true) sem DATABASE_URL o SQLite seria apagado a cada atualização: bloqueia o uso."""
+    if os.environ.get("RENDER") and not D.DATABASE_URL and request.endpoint != "static":
+        return ("<div style='font-family:sans-serif;max-width:560px;margin:80px auto;line-height:1.5'>"
+                "<h2>Sistema em configuração</h2><p>O banco de dados permanente ainda não foi ligado "
+                "(variável <code>DATABASE_URL</code> no Render). Assim que for configurado, esta página "
+                "libera o primeiro acesso.</p></div>"), 503
+
+
 @app.context_processor
 def _ctx():
     return {"usuario_nome": session.get("usuario_nome"), "is_admin": session.get("is_admin"),
