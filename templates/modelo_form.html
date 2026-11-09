@@ -33,6 +33,9 @@
   <p><a class="btn sec" href="{{ url_for('modelo_exemplo', mid=m.id) }}" target="_blank">Ver PDF de exemplo</a></p>
   {% if not m.padrao %}<form method="post"><input type="hidden" name="acao" value="padrao"><button class="btn sec">Usar como padrão</button></form>
   <p class="peq muted">O modelo padrão é sugerido automaticamente nos pedidos novos (dá para trocar em cada pedido).</p>{% endif %}
+  <form method="post" action="{{ url_for('modelo_excluir', mid=m.id) }}" style="margin-top:14px"
+    data-msg="Excluir o modelo &quot;{{ m.nome }}&quot;? Pedidos já emitidos com ele não mudam." onsubmit="return confirm(this.dataset.msg)">
+    <button class="btn perigo">Excluir modelo</button></form>
 </div>
 </div>
 {% endblock %}

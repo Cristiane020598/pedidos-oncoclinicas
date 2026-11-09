@@ -1,5 +1,6 @@
 {% extends "base.html" %}{% block titulo %}Médicos{% endblock %}
-{% block corpo %}
+{% block corpo %}{% from "_excluir.html" import botao_excluir with context %}
+
 <h1>Médicos solicitantes</h1>
 <p class="sub">Quem assina o pedido. Em cada pedido você escolhe o médico; o sistema sugere o último usado para o paciente
 (ou o médico responsável da planilha). O nome e o CRM saem no quadro do topo e na assinatura do PDF.</p>
@@ -16,7 +17,8 @@
     <input type="text" name="rotulo" value="{{ m.rotulo or '' }}"><button class="btn sec peq">salvar</button></form></td>
   <td>{{ m.n_ped }}</td><td>{{ 'Ativo' if m.ativo else 'Inativo' }}</td>
   <td><form method="post"><input type="hidden" name="id" value="{{ m.id }}"><input type="hidden" name="acao" value="{{ 'desativar' if m.ativo else 'ativar' }}">
-    <button class="btn sec peq">{{ 'Desativar' if m.ativo else 'Reativar' }}</button></form></td></tr>
+    <button class="btn sec peq">{{ 'Desativar' if m.ativo else 'Reativar' }}</button></form>
+    {% if not m.n_ped %}{{ botao_excluir('medico', m.id, 'Excluir o médico ' ~ m.nome ~ '?') }}{% endif %}</td></tr>
 {% else %}<tr><td colspan="6" class="muted">Nenhum médico cadastrado. O médico do modelo importado entra aqui automaticamente.</td></tr>{% endfor %}
 </table>
 {% endblock %}

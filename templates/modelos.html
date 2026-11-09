@@ -11,6 +11,10 @@
 {% for m in modelos %}<tr><td><a href="{{ url_for('modelo_form', mid=m.id) }}">{{ m.nome }}</a> {% if m.padrao %}<span class="tag validado">padrão</span>{% endif %}<div class="peq muted">{{ m.arquivo_nome or '' }}</div></td>
 <td>{{ m.instituicao or '' }}</td><td>{{ m.medico or '' }} <span class="muted">{{ m.crm or '' }}</span></td>
 <td>{% if m.tem_img %}<img src="{{ url_for('modelo_cabecalho', mid=m.id) }}" style="height:22px;max-width:260px">{% else %}—{% endif %}</td>
-<td><a href="{{ url_for('modelo_exemplo', mid=m.id) }}" target="_blank">ver exemplo PDF</a></td></tr>{% endfor %}</table>
+<td><a href="{{ url_for('modelo_exemplo', mid=m.id) }}" target="_blank">ver exemplo PDF</a>
+<form method="post" action="{{ url_for('modelo_excluir', mid=m.id) }}" style="display:inline;margin-left:10px"
+  data-msg="Excluir o modelo &quot;{{ m.nome }}&quot;?{% if m.n_ped %}&#10;&#10;Ele já foi usado em {{ m.n_ped }} pedido(s): os PDFs já emitidos não mudam, e os rascunhos passam para o modelo padrão.{% endif %}"
+  onsubmit="return confirm(this.dataset.msg)">
+  <button class="btn perigo peq">excluir</button></form></td></tr>{% endfor %}</table>
 {% else %}<p class="muted">Nenhum modelo ainda.</p>{% endif %}
 {% endblock %}

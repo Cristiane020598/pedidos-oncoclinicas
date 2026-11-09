@@ -8,7 +8,8 @@
   .cab{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:6px 16px}
   .cab div span{display:block;font-size:11.5px;color:#6b7280;text-transform:uppercase}
 </style>{% endblock %}
-{% block corpo %}
+{% block corpo %}{% from "_excluir.html" import botao_excluir with context %}
+
 {% set editavel = p.status == 'rascunho' %}
 <div class="linha" style="justify-content:space-between">
   <h1>Pedido nº {{ p.id }} · {{ p.rotulo }} <span class="tag {{ p.status }}">{{ p.status }}</span></h1>
@@ -97,7 +98,8 @@
 </form>
 
 {% if editavel %}<form method="post" onsubmit="return confirm('Cancelar este pedido?')" class="linha"><input type="hidden" name="acao" value="cancelar">
-  <input type="text" name="motivo" placeholder="motivo do cancelamento"><button class="btn perigo peq">Cancelar pedido</button></form>{% endif %}
+  <input type="text" name="motivo" placeholder="motivo do cancelamento"><button class="btn perigo peq">Cancelar pedido</button></form>
+<p class="peq muted">Criou por engano? {{ botao_excluir('pedido', p.id, 'Excluir este rascunho de pedido? Ele some da lista (fica registrado na Auditoria).', 'Excluir rascunho', url_for('pedidos')) }}</p>{% endif %}
 
 <h2>Histórico deste pedido</h2>
 <table class="t">{% for r in trilha %}<tr><td class="peq" style="white-space:nowrap">{{ r.quando }}</td><td>{{ r.usuario }}</td><td>{{ r.acao }}</td><td class="peq muted" style="word-break:break-word">{{ r.detalhes or '' }}</td></tr>{% endfor %}</table>

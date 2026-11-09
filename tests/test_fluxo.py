@@ -315,6 +315,64 @@ class Fluxo(unittest.TestCase):
             self.assertEqual(c.get(url).status_code, 200, url)
         self.assertGreater(conn.execute("SELECT COUNT(*) FROM auditoria").fetchone()[0], 20)
 
+        # excluir modelo: nunca usado → apaga; já usado → some da lista, pedidos continuam abrindo
+        conn.execute("INSERT INTO modelos (nome, padrao, criado_em) VALUES ('Sem uso', 0, '2026-01-01')")
+        conn.commit()
+        sem_uso = conn.execute("SELECT id FROM modelos WHERE nome='Sem uso'").fetchone()[0]
+        c.post(f"/modelos/{sem_uso}/excluir")
+        self.assertIsNone(conn.execute("SELECT id FROM modelos WHERE id=?", (sem_uso,)).fetchone())
+        conn.execute("INSERT INTO modelos (nome, padrao, criado_em) VALUES ('Outro modelo', 0, '2026-01-01')")
+        conn.commit()
+        usado = conn.execute("SELECT modelo_id FROM pedidos WHERE modelo_id IS NOT NULL").fetchone()[0]
+        nome_usado = conn.execute("SELECT nome FROM modelos WHERE id=?", (usado,)).fetchone()[0]
+        c.post(f"/modelos/{usado}/excluir")
+        self.assertIsNotNone(conn.execute("SELECT excluido_em FROM modelos WHERE id=?", (usado,)).fetchone()[0])
+        self.assertNotIn(f'href="/modelos/{usado}"', c.get("/modelos").get_data(as_text=True), nome_usado)
+        self.assertEqual(conn.execute("SELECT nome FROM modelos WHERE padrao=1").fetchone()[0], "Outro modelo")
+        self.assertEqual(conn.execute("SELECT COUNT(*) FROM pedidos WHERE status='rascunho' AND modelo_id=?",
+                                      (usado,)).fetchone()[0], 0)
+        for url in (f"/pedidos/{ped}", f"/pedidos/{ped2}", "/modelos", "/"):
+            self.assertEqual(c.get(url).status_code, 200, url)
+        self.assertEqual(c.post(f"/modelos/{usado}/excluir").status_code, 404)
+
+        # excluir cadastros feitos por engano
+        conta = lambda sql, *a: conn.execute(sql, a).fetchone()[0]  # noqa: E731
+        emitido = conn.execute("SELECT id, paciente_id, protocolo_id, medico_id FROM pedidos WHERE status='emitido'").fetchone()
+        c.post(f"/excluir/pedido/{emitido['id']}")                      # emitido: não apaga
+        self.assertEqual(conta("SELECT COUNT(*) FROM pedidos WHERE id=?", emitido["id"]), 1)
+        c.post(f"/excluir/paciente/{emitido['paciente_id']}")           # tem pedido: não apaga
+        self.assertEqual(conta("SELECT COUNT(*) FROM pacientes WHERE id=?", emitido["paciente_id"]), 1)
+        c.post(f"/excluir/protocolo/{emitido['protocolo_id']}")         # usado em pedido: não apaga
+        self.assertEqual(conta("SELECT COUNT(*) FROM protocolos WHERE id=?", emitido["protocolo_id"]), 1)
+        rasc = conn.execute("SELECT id FROM pedidos WHERE status='rascunho'").fetchone()
+        if rasc:
+            c.post(f"/excluir/pedido/{rasc['id']}")
+            self.assertEqual(conta("SELECT COUNT(*) FROM pedidos WHERE id=?", rasc["id"]), 0)
+        # paciente, médico, estudo e protocolo novos (sem uso) → apagam
+        c.post("/pacientes/novo", data={"nome": "Cadastrado Por Engano"})
+        pe = conta("SELECT id FROM pacientes WHERE nome='Cadastrado Por Engano'")
+        self.assertIn("Cadastrado Por Engano", c.get("/pacientes").get_data(as_text=True))
+        c.post(f"/excluir/paciente/{pe}")
+        self.assertEqual(conta("SELECT COUNT(*) FROM pacientes WHERE id=?", pe), 0)
+        c.post("/medicos", data={"nome": "Dr. Engano", "crm": "CRM 1"})
+        me = conta("SELECT id FROM medicos WHERE nome='Dr. Engano'")
+        c.post(f"/excluir/medico/{me}")
+        self.assertEqual(conta("SELECT COUNT(*) FROM medicos WHERE id=?", me), 0)
+        c.post(f"/excluir/protocolo/{novo}")  # rascunho "v4.0" criado acima, sem pedidos
+        self.assertEqual(conta("SELECT COUNT(*) FROM protocolos WHERE id=?", novo), 0)
+        self.assertEqual(conta("SELECT COUNT(*) FROM visitas WHERE protocolo_id=?", novo), 0)
+        c.post("/estudos", data={"codigo": "ESTUDO-ENGANO"})
+        ee = conta("SELECT id FROM estudos WHERE codigo='ESTUDO-ENGANO'")
+        c.post(f"/excluir/estudo/{ee}")
+        self.assertEqual(conta("SELECT COUNT(*) FROM estudos WHERE id=?", ee), 0)
+        c.post(f"/excluir/estudo/{estudo}")                              # tem pacientes: não apaga
+        self.assertEqual(conta("SELECT COUNT(*) FROM estudos WHERE id=?", estudo), 1)
+        self.assertGreaterEqual(conta("SELECT COUNT(*) FROM auditoria WHERE acao LIKE 'excluiu %'"), 5)
+        self.assertEqual(c.post("/excluir/usuario/1").status_code, 404)
+        for url in ("/pacientes", "/estudos", "/medicos", "/pedidos", f"/pedidos/{emitido['id']}",
+                    f"/pacientes/{emitido['paciente_id']}"):
+            self.assertEqual(c.get(url).status_code, 200, url)
+
 
 class Datas(unittest.TestCase):
     def test_parse(self):

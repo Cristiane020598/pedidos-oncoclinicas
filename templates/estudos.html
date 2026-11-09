@@ -1,5 +1,6 @@
 {% extends "base.html" %}{% block titulo %}Estudos e protocolos{% endblock %}
-{% block corpo %}
+{% block corpo %}{% from "_excluir.html" import botao_excluir with context %}
+
 <h1>Estudos e protocolos</h1>
 <p class="sub">Cada estudo tem versões de protocolo. Só a versão <b>validada</b> é usada para montar os pedidos; ao validar uma nova versão (emenda), a anterior fica como "substituído".</p>
 <div class="card"><h3 style="margin-top:0">Cadastrar estudo</h3>
@@ -18,13 +19,15 @@
       <details style="display:inline-block"><summary class="peq" style="cursor:pointer">editar</summary>
       <form method="post" class="linha"><input type="hidden" name="id" value="{{ e.id }}">
         <input type="text" name="codigo" value="{{ e.codigo }}"><input type="text" name="nome" value="{{ e.nome or '' }}" placeholder="nome">
-        <input type="text" name="patrocinador" value="{{ e.patrocinador or '' }}" placeholder="patrocinador"><button class="btn peq">ok</button></form></details></div>
+        <input type="text" name="patrocinador" value="{{ e.patrocinador or '' }}" placeholder="patrocinador"><button class="btn peq">ok</button></form></details>
+      {% if not e.n_pac_total and not protocolos.get(e.id) %}{{ botao_excluir('estudo', e.id, 'Excluir o estudo ' ~ e.codigo ~ '?') }}{% endif %}</div>
   </div>
   {% set ps = protocolos.get(e.id, []) %}
   {% if ps %}<table class="t" style="margin-top:10px"><tr><th>Versão</th><th>Arquivo</th><th>Situação</th><th>Validado</th><th></th></tr>
   {% for p in ps %}<tr><td>{{ p.versao }}</td><td>{{ p.arquivo_nome or '—' }}</td><td><span class="tag {{ p.status }}">{{ p.status }}</span></td>
   <td>{% if p.validado_em %}{{ p.validado_em|data_br }} · {{ p.validado_por }}{% endif %}</td>
-  <td><a href="{{ url_for('protocolo', pid=p.id) }}">abrir cronograma</a></td></tr>{% endfor %}</table>
+  <td style="white-space:nowrap"><a href="{{ url_for('protocolo', pid=p.id) }}">abrir cronograma</a>
+  {% if not p.n_ped %}{{ botao_excluir('protocolo', p.id, 'Excluir o protocolo ' ~ p.versao ~ ' (com visitas, exames e matriz)?' ~ (' Ele está VALIDADO; a versão anterior, se houver, volta a valer.' if p.status == 'validado' else '')) }}{% endif %}</td></tr>{% endfor %}</table>
   {% else %}<p class="muted peq">Nenhum protocolo importado.</p>{% endif %}
 </div>
 {% else %}<p class="muted">Nenhum estudo cadastrado. Eles também são criados automaticamente ao importar a planilha de pacientes (pela coluna do código do estudo).</p>

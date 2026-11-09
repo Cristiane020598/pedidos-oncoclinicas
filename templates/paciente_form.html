@@ -1,5 +1,6 @@
 {% extends "base.html" %}{% block titulo %}Paciente{% endblock %}
-{% block corpo %}
+{% block corpo %}{% from "_excluir.html" import botao_excluir with context %}
+
 <h1>{{ p.nome if p else 'Cadastrar paciente' }}</h1>
 <div class="card"><form method="post">
   <div class="linha">
@@ -17,7 +18,8 @@
   <p><button class="btn">Salvar</button> <a href="{{ url_for('pacientes') }}">voltar</a>
   {% if p %}<a class="btn sec" style="float:right" href="{{ url_for('pedido_novo', paciente=p.id) }}">Novo pedido para este paciente</a>{% endif %}</p>
 </form>
-{% if p %}<form method="post" onsubmit="return confirm('Arquivar este paciente? Os pedidos continuam no histórico.')"><input type="hidden" name="acao" value="arquivar"><button class="btn perigo peq">Arquivar paciente</button></form>{% endif %}
+{% if p %}<form method="post" onsubmit="return confirm('Arquivar este paciente? Os pedidos continuam no histórico.')"><input type="hidden" name="acao" value="arquivar"><button class="btn perigo peq">Arquivar paciente</button></form>
+{% if not pedidos %}<p class="peq muted" style="margin-top:8px">Cadastrado por engano? {{ botao_excluir('paciente', p.id, 'Excluir de vez o paciente ' ~ p.nome ~ '?', 'Excluir paciente', url_for('pacientes')) }}</p>{% endif %}{% endif %}
 </div>
 {% if pedidos %}<h2>Pedidos deste paciente</h2>
 <table class="t"><tr><th>Nº</th><th>Visita</th><th>Data coleta</th><th>Situação</th><th>Criado</th></tr>

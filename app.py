@@ -169,7 +169,7 @@ def inicio():
         "protocolos_rascunho": c("SELECT COUNT(*) FROM protocolos WHERE status='rascunho'"),
         "pedidos_emitidos": c("SELECT COUNT(*) FROM pedidos WHERE status='emitido'"),
         "pedidos_rascunho": c("SELECT COUNT(*) FROM pedidos WHERE status='rascunho'"),
-        "modelos": c("SELECT COUNT(*) FROM modelos"),
+        "modelos": c("SELECT COUNT(*) FROM modelos WHERE excluido_em IS NULL"),
     }
     recentes = conn.execute("""SELECT p.*, pa.nome AS paciente, e.codigo AS estudo FROM pedidos p
         JOIN pacientes pa ON pa.id=p.paciente_id JOIN protocolos pr ON pr.id=p.protocolo_id
@@ -219,9 +219,11 @@ def estudos():
                 flash("Já existe um estudo com esse código.", "erro")
         return redirect(url_for("estudos"))
     lista = conn.execute("""SELECT e.*,
-        (SELECT COUNT(*) FROM pacientes p WHERE p.estudo_id=e.id AND p.ativo=1) AS n_pac
+        (SELECT COUNT(*) FROM pacientes p WHERE p.estudo_id=e.id AND p.ativo=1) AS n_pac,
+        (SELECT COUNT(*) FROM pacientes p WHERE p.estudo_id=e.id) AS n_pac_total
         FROM estudos e ORDER BY e.codigo""").fetchall()
-    protos = conn.execute("SELECT id, estudo_id, versao, status, arquivo_nome, validado_em, validado_por, criado_em "
+    protos = conn.execute("SELECT id, estudo_id, versao, status, arquivo_nome, validado_em, validado_por, criado_em, "
+                          "(SELECT COUNT(*) FROM pedidos x WHERE x.protocolo_id=protocolos.id) AS n_ped "
                           "FROM protocolos ORDER BY id DESC").fetchall()
     por_estudo = {}
     for p in protos:
@@ -237,7 +239,9 @@ def pacientes():
     conn = D.db()
     q = request.args.get("q", "").strip()
     estudo = request.args.get("estudo", "")
-    sql = """SELECT p.*, e.codigo AS estudo_codigo FROM pacientes p LEFT JOIN estudos e ON e.id=p.estudo_id
+    sql = """SELECT p.*, e.codigo AS estudo_codigo,
+             (SELECT COUNT(*) FROM pedidos x WHERE x.paciente_id=p.id) AS n_ped
+             FROM pacientes p LEFT JOIN estudos e ON e.id=p.estudo_id
              WHERE p.ativo=1"""
     args = []
     if q:
@@ -863,8 +867,123 @@ INSTRUCAO_LAB_PADRAO = "COLETAR NO AMAIS – Laboratório Amais"
 @login_required
 def modelos():
     lista = D.db().execute("SELECT id, nome, instituicao, medico, crm, padrao, arquivo_nome, criado_em, "
-                           "cabecalho_img IS NOT NULL AS tem_img FROM modelos ORDER BY padrao DESC, nome").fetchall()
+                           "cabecalho_img IS NOT NULL AS tem_img, "
+                           "(SELECT COUNT(*) FROM pedidos p WHERE p.modelo_id=modelos.id) AS n_ped "
+                           "FROM modelos WHERE excluido_em IS NULL ORDER BY padrao DESC, nome").fetchall()
     return render_template("modelos.html", modelos=lista)
+
+
+@app.route("/modelos/<int:mid>/excluir", methods=["POST"])
+@login_required
+def modelo_excluir(mid):
+    """Modelo nunca usado: apaga de vez. Já usado em pedido: só some das listas (o PDF emitido continua igual
+    e a trilha de auditoria continua apontando para ele). Rascunhos que usavam o modelo passam para o novo padrão."""
+    conn = D.db()
+    m = conn.execute("SELECT id, nome, padrao FROM modelos WHERE id=? AND excluido_em IS NULL", (mid,)).fetchone()
+    if not m:
+        abort(404)
+    usado = conn.execute("SELECT COUNT(*) FROM pedidos WHERE modelo_id=?", (mid,)).fetchone()[0]
+    if usado:
+        conn.execute("UPDATE modelos SET excluido_em=?, excluido_por=?, padrao=0 WHERE id=?",
+                     (D.agora(), D.usuario_atual(), mid))
+    else:
+        conn.execute("DELETE FROM modelos WHERE id=?", (mid,))
+    novo_padrao = None
+    if m["padrao"]:
+        r = conn.execute("SELECT id FROM modelos WHERE excluido_em IS NULL ORDER BY nome LIMIT 1").fetchone()
+        if r:
+            novo_padrao = r["id"]
+            conn.execute("UPDATE modelos SET padrao=1 WHERE id=?", (novo_padrao,))
+    else:
+        r = conn.execute("SELECT id FROM modelos WHERE padrao=1").fetchone()
+        novo_padrao = r["id"] if r else None
+    if usado:
+        conn.execute("UPDATE pedidos SET modelo_id=? WHERE modelo_id=? AND status='rascunho'", (novo_padrao, mid))
+    D.registrar("excluiu modelo de pedido", "modelo", mid,
+                {"nome": m["nome"], "pedidos_que_usaram": usado, "modo": "arquivado" if usado else "apagado",
+                 "novo_padrao_id": novo_padrao})
+    conn.commit()
+    flash(f"Modelo \"{m['nome']}\" excluído." + (" Os pedidos já emitidos com ele não mudam." if usado else ""), "ok")
+    return redirect(url_for("modelos"))
+
+
+# ------------------------------------------------------------------ excluir cadastro feito por engano
+
+def _conta(conn, sql, *args):
+    return conn.execute(sql, args).fetchone()[0]
+
+
+@app.route("/excluir/<tipo>/<int:eid>", methods=["POST"])
+@login_required
+def excluir(tipo, eid):
+    """Apaga algo cadastrado por engano. Só apaga o que ainda não foi usado em pedido emitido/rascunho;
+    quando já foi usado, explica a alternativa (arquivar/desativar/cancelar), para não quebrar o histórico.
+    Toda exclusão fica na Auditoria com os dados principais do que foi apagado."""
+    conn = D.db()
+    volta = request.form.get("volta") or url_for("inicio")
+    if not volta.startswith("/"):
+        volta = url_for("inicio")
+
+    def bloqueia(msg):
+        flash(msg, "erro")
+        return redirect(volta)
+
+    if tipo == "pedido":
+        p = conn.execute("SELECT id, paciente_id, rotulo, status FROM pedidos WHERE id=?", (eid,)).fetchone() or abort(404)
+        if p["status"] != "rascunho":
+            return bloqueia("Pedido já emitido não pode ser excluído — use \"Cancelar pedido\" (o PDF fica no histórico).")
+        conn.execute("DELETE FROM pedidos WHERE id=?", (eid,))
+        detalhes, msg, destino = dict(p), f"Rascunho de pedido {p['rotulo'] or ''} excluído.", url_for("pedidos")
+
+    elif tipo == "paciente":
+        p = conn.execute("SELECT id, nome, participante, estudo_id FROM pacientes WHERE id=?", (eid,)).fetchone() or abort(404)
+        if _conta(conn, "SELECT COUNT(*) FROM pedidos WHERE paciente_id=?", eid):
+            return bloqueia("Este paciente já tem pedido. Exclua/cancele os pedidos ou use \"Arquivar paciente\".")
+        conn.execute("DELETE FROM pacientes WHERE id=?", (eid,))
+        detalhes, msg, destino = dict(p), f"Paciente {p['nome']} excluído.", url_for("pacientes")
+
+    elif tipo == "protocolo":
+        p = conn.execute("SELECT id, estudo_id, versao, status FROM protocolos WHERE id=?", (eid,)).fetchone() or abort(404)
+        if _conta(conn, "SELECT COUNT(*) FROM pedidos WHERE protocolo_id=?", eid):
+            return bloqueia("Este protocolo já foi usado em pedido e não pode ser excluído. "
+                            "Para corrigir, use \"Nova versão a partir desta\".")
+        conn.execute("DELETE FROM visita_itens WHERE visita_id IN (SELECT id FROM visitas WHERE protocolo_id=?)", (eid,))
+        for t in ("visitas", "itens", "protocolo_paginas"):
+            conn.execute(f"DELETE FROM {t} WHERE protocolo_id=?", (eid,))
+        conn.execute("DELETE FROM protocolos WHERE id=?", (eid,))
+        msg = f"Protocolo {p['versao']} excluído."
+        if p["status"] == "validado":  # a versão anterior volta a valer
+            ant = conn.execute("SELECT id, versao FROM protocolos WHERE estudo_id=? AND status='substituido' "
+                               "ORDER BY id DESC LIMIT 1", (p["estudo_id"],)).fetchone()
+            if ant:
+                conn.execute("UPDATE protocolos SET status='validado' WHERE id=?", (ant["id"],))
+                D.registrar("protocolo voltou a valer (versão seguinte excluída)", "protocolo", ant["id"], {"excluido": eid})
+                msg += f" A versão {ant['versao']} voltou a ser a validada."
+        detalhes, destino = dict(p), url_for("estudos")
+
+    elif tipo == "estudo":
+        e = conn.execute("SELECT id, codigo, nome FROM estudos WHERE id=?", (eid,)).fetchone() or abort(404)
+        n_pac = _conta(conn, "SELECT COUNT(*) FROM pacientes WHERE estudo_id=?", eid)
+        n_pro = _conta(conn, "SELECT COUNT(*) FROM protocolos WHERE estudo_id=?", eid)
+        if n_pac or n_pro:
+            return bloqueia(f"O estudo {e['codigo']} ainda tem {n_pac} paciente(s) e {n_pro} protocolo(s). "
+                            "Exclua-os primeiro (ou troque o estudo dos pacientes).")
+        conn.execute("DELETE FROM estudos WHERE id=?", (eid,))
+        detalhes, msg, destino = dict(e), f"Estudo {e['codigo']} excluído.", url_for("estudos")
+
+    elif tipo == "medico":
+        m = conn.execute("SELECT id, nome, crm FROM medicos WHERE id=?", (eid,)).fetchone() or abort(404)
+        if _conta(conn, "SELECT COUNT(*) FROM pedidos WHERE medico_id=?", eid):
+            return bloqueia("Este médico já assinou pedido — use \"Desativar\" para ele não aparecer mais.")
+        conn.execute("DELETE FROM medicos WHERE id=?", (eid,))
+        detalhes, msg, destino = dict(m), f"Médico {m['nome']} excluído.", url_for("medicos")
+
+    else:
+        abort(404)
+    D.registrar(f"excluiu {tipo} (cadastro por engano)", tipo, eid, detalhes)
+    conn.commit()
+    flash(msg, "ok")
+    return redirect(destino)
 
 
 @app.route("/modelos/importar", methods=["POST"])
@@ -1237,7 +1356,8 @@ def pedido(pid):
         flash("Conferência salva.", "ok")
         return redirect(url_for("pedido", pid=pid))
 
-    modelos_l = conn.execute("SELECT id, nome, padrao FROM modelos ORDER BY padrao DESC, nome").fetchall()
+    modelos_l = conn.execute("SELECT id, nome, padrao FROM modelos WHERE excluido_em IS NULL OR id=? "
+                             "ORDER BY padrao DESC, nome", (p["modelo_id"],)).fetchall()
     trilha = conn.execute("SELECT * FROM auditoria WHERE entidade='pedido' AND entidade_id=? ORDER BY id", (pid,)).fetchall()
     todos = itens + [dict(r, _removido=True) for r in removidos]
     medicos_l = conn.execute("SELECT id, nome, crm, ativo FROM medicos WHERE ativo=1 OR id=? ORDER BY nome",

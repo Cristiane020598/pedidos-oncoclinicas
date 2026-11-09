@@ -1,0 +1,7 @@
+{# Botão "excluir" para cadastro feito por engano. Uso:
+   {% from "_excluir.html" import botao_excluir with context %}
+   {{ botao_excluir('paciente', p.id, 'Excluir este paciente?') }} #}
+{% macro botao_excluir(tipo, id, msg, texto='excluir', volta=None) -%}
+<form method="post" action="{{ url_for('excluir', tipo=tipo, eid=id) }}" style="display:inline"
+  data-msg="{{ msg }}" onsubmit="return confirm(this.dataset.msg)"><input type="hidden" name="volta" value="{{ volta or request.full_path.rstrip('?') }}"><button class="btn perigo peq">{{ texto }}</button></form>
+{%- endmacro %}

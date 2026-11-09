@@ -320,6 +320,8 @@ COLUNAS_NOVAS = {
     "modelos": {
         "mostrar_assinatura": "INTEGER NOT NULL DEFAULT 0",   # campo de carimbo/assinatura no fim do pedido
         "instrucao_lab": "TEXT",                               # ex.: COLETAR NO AMAIS – Laboratório Amais
+        "excluido_em": "TEXT",       # modelo excluído que já foi usado em pedido: some das listas, mas fica guardado
+        "excluido_por": "TEXT",
     },
 }
 

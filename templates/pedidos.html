@@ -1,5 +1,6 @@
 {% extends "base.html" %}{% block titulo %}Pedidos{% endblock %}
-{% block corpo %}
+{% block corpo %}{% from "_excluir.html" import botao_excluir with context %}
+
 <div class="linha" style="justify-content:space-between"><h1>Pedidos</h1><a class="btn" href="{{ url_for('pedido_novo') }}">+ Novo pedido</a></div>
 <form class="linha card" method="get">
   <div><label>Buscar</label><input type="text" name="q" value="{{ q }}" placeholder="paciente, participante ou visita (C10D15)"></div>
@@ -10,6 +11,7 @@
 {% for r in pedidos %}<tr><td><a href="{{ url_for('pedido', pid=r.id) }}">{{ r.id }}</a></td><td>{{ r.paciente }}<div class="peq muted">{{ r.participante or '' }}</div></td>
 <td>{{ r.estudo }}</td><td><b>{{ r.rotulo }}</b></td><td>{{ r.data_coleta|data_br }}</td><td><span class="tag {{ r.status }}">{{ r.status }}</span></td>
 <td class="peq">{{ r.criado_em|data_br }} · {{ r.criado_por }}</td><td class="peq">{% if r.emitido_em %}{{ r.emitido_em|data_br }} · {{ r.emitido_por }}{% endif %}</td>
-<td>{% if r.status != 'cancelado' %}<a href="{{ url_for('pedido_pdf', pid=r.id) }}" target="_blank">PDF</a>{% endif %}</td></tr>
+<td>{% if r.status != 'cancelado' %}<a href="{{ url_for('pedido_pdf', pid=r.id) }}" target="_blank">PDF</a>{% endif %}
+{% if r.status == 'rascunho' %}{{ botao_excluir('pedido', r.id, 'Excluir o rascunho ' ~ (r.rotulo or '') ~ ' de ' ~ r.paciente ~ '?') }}{% endif %}</td></tr>
 {% else %}<tr><td colspan="9" class="muted">Nenhum pedido.</td></tr>{% endfor %}</table></div>
 {% endblock %}
